@@ -5,7 +5,7 @@ import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 group = "com.adrinand"
-version = "0.0.1"
+version = "1.0.0"
 
 val isLinux = System.getProperty("os.name").lowercase().contains("linux")
 
