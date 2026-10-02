@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalComposeLibrary::class)
 
+import org.gradle.language.jvm.tasks.ProcessResources
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
@@ -47,8 +48,8 @@ dependencies {
     testImplementation("org.junit.vintage:junit-vintage-engine:5.10.1")
 }
 
-val rustDir = layout.projectDirectory.dir("lib/ktile-hotkey")
-val rustReleaseSo = rustDir.file("target/release/libktile_hotkey.so")
+val rustDir = layout.projectDirectory.dir("lib/kofre-hotkey")
+val rustReleaseSo = rustDir.file("target/release/libkofre_hotkey.so")
 val rustLibsDir = layout.buildDirectory.dir("rust-libs")
 
 val buildRustRelease by tasks.registering(Exec::class) {
@@ -70,41 +71,56 @@ val copyRustLib by tasks.registering(Copy::class) {
     onlyIf { isLinux }
 }
 
-tasks.named("processResources") {
+tasks.named<ProcessResources>("processResources") {
     dependsOn(copyRustLib)
-}
-
-afterEvaluate {
-    tasks.named("prepareAppResources") {
-        dependsOn(copyRustLib)
+    if (isLinux) {
+        from(rustReleaseSo) {
+            into("linux-x86-64")
+            rename { "libkofre_hotkey.so" }
+        }
+        from(rustReleaseSo) {
+            into("linux-x86_64")
+            rename { "libkofre_hotkey.so" }
+        }
+        from(rustReleaseSo) {
+            into("linux-aarch64")
+            rename { "libkofre_hotkey.so" }
+        }
+        // Fallback location used by the manual extraction in KofreHotkeyNative
+        from(rustReleaseSo) {
+            into("natives/linux-x86-64")
+            rename { "libkofre_hotkey.so" }
+        }
+        from(rustReleaseSo) {
+            into("natives/linux-aarch64")
+            rename { "libkofre_hotkey.so" }
+        }
     }
 }
 
 compose.desktop {
     application {
-        mainClass = "com.adrinand.ktile.MainKt"
+        mainClass = "com.adrinand.kofre.MainKt"
         jvmArgs +=
             listOf(
                 "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
                 "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
-                "-Djna.library.path=${rustLibsDir.get().asFile.absolutePath}",
             )
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Rpm)
-            packageName = "ktile"
+            packageName = "kofre"
             packageVersion = version.toString()
             description = "A keyboard-driven tiling window manager"
             copyright = "© 2026 adrinand"
             vendor = "adrinand"
-            appResourcesRootDir.set(rustLibsDir)
 
             macOS {
-                bundleID = "com.adrinand.ktile"
-                iconFile.set(project.file("src/main/resources/ktile.icns"))
+                bundleID = "com.adrinand.kofre"
+                iconFile.set(project.file("src/main/resources/kofre.icns"))
             }
 
             linux {
-                iconFile.set(project.file("src/main/resources/ktile.png"))
+                iconFile.set(project.file("src/main/resources/kofre.png"))
             }
         }
     }
@@ -123,18 +139,18 @@ kover {
                 // App bootstrap and OS-specific integration code: not unit-testable headless,
                 // covered by functional tests (core.screen) and per-OS integration tests (providers, window, tray).
                 classes(
-                    "com.adrinand.ktile.MainKt*",
-                    "com.adrinand.ktile.ComposableSingletons*",
-                    "com.adrinand.ktile.core.screen.*",
-                    "com.adrinand.ktile.core.hotkey.LinuxEvdevHotkeyProvider*",
-                    "com.adrinand.ktile.core.hotkey.JNativeHookProvider*",
-                    "com.adrinand.ktile.core.hotkey.KtileHotkeyNative*",
-                    "com.adrinand.ktile.core.hotkey.InputDevicePermissionChecker",
-                    "com.adrinand.ktile.ui.KTileWindowKt*",
-                    "com.adrinand.ktile.ui.KTileTrayKt*",
-                    "com.adrinand.ktile.ui.TrayIconKt*",
-                    "com.adrinand.ktile.ui.tray.*",
-                    "com.adrinand.ktile.ui.GlobalHotkeyRegistration*",
+                    "com.adrinand.kofre.MainKt*",
+                    "com.adrinand.kofre.ComposableSingletons*",
+                    "com.adrinand.kofre.core.screen.*",
+                    "com.adrinand.kofre.core.hotkey.LinuxEvdevHotkeyProvider*",
+                    "com.adrinand.kofre.core.hotkey.JNativeHookProvider*",
+                    "com.adrinand.kofre.core.hotkey.KofreHotkeyNative*",
+                    "com.adrinand.kofre.core.hotkey.InputDevicePermissionChecker",
+                    "com.adrinand.kofre.ui.KofreWindowKt*",
+                    "com.adrinand.kofre.ui.KofreTrayKt*",
+                    "com.adrinand.kofre.ui.TrayIconKt*",
+                    "com.adrinand.kofre.ui.tray.*",
+                    "com.adrinand.kofre.ui.GlobalHotkeyRegistration*",
                 )
             }
         }
@@ -184,9 +200,9 @@ tasks.register<Exec>("installGnomeExtension") {
         "bash",
         "-c",
         """
-        install -d "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/ktile@adrinand"
-        cp -r extensions/gnome/ktile@adrinand/* "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/ktile@adrinand/"
-        echo "GNOME Shell extension installed. Log Out and enable it using: gnome-extensions enable ktile@adrinand"
+        install -d "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/kofre@adrinand"
+        cp -r extensions/gnome/kofre@adrinand/* "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/kofre@adrinand/"
+        echo "GNOME Shell extension installed. Log Out and enable it using: gnome-extensions enable kofre@adrinand"
         """.trimIndent(),
     )
 }
@@ -198,8 +214,8 @@ tasks.register<Exec>("installKdeScript") {
         "bash",
         "-c",
         """
-        install -d "${System.getProperty("user.home")}/.local/share/kwin/scripts/ktile.kwin"
-        cp -r extensions/kde/ktile.kwin/* "${System.getProperty("user.home")}/.local/share/kwin/scripts/ktile.kwin/"
+        install -d "${System.getProperty("user.home")}/.local/share/kwin/scripts/kofre.kwin"
+        cp -r extensions/kde/kofre.kwin/* "${System.getProperty("user.home")}/.local/share/kwin/scripts/kofre.kwin/"
         echo "KDE KWin script installed. Enable it in KWin script settings."
         """.trimIndent(),
     )
