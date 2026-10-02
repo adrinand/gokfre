@@ -98,8 +98,8 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p build/artifacts
-          cp "build/compose/binaries/main/deb/ktile_${{ needs.version.outputs.version }}_amd64.deb" build/artifacts/
-          cp "build/compose/binaries/main/rpm/ktile-${{ needs.version.outputs.version }}-1.x86_64.rpm" build/artifacts/
+          cp "build/compose/binaries/main/deb/kofre_${{ needs.version.outputs.version }}_amd64.deb" build/artifacts/
+          cp "build/compose/binaries/main/rpm/kofre-${{ needs.version.outputs.version }}-1.x86_64.rpm" build/artifacts/
           cp "${{ steps.appimage.outputs.appimage-path }}" build/artifacts/
 
       - name: Upload artifacts
