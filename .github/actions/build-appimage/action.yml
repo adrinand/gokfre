@@ -25,8 +25,8 @@ runs:
       run: |
         set -euo pipefail
         VERSION="${{ inputs.version }}"
-        APP_NAME="kofre"
-        PACKAGE_NAME="Kofre"
+        APP_NAME="gokfre"
+        PACKAGE_NAME="Gokfre"
         APP_DIR="$PWD/build/AppDir"
         COMPOSE_APP_DIR="$PWD/build/compose/binaries/main/app/$APP_NAME"
         ARCH="$(uname -m)"
@@ -57,7 +57,7 @@ runs:
         cat > "$APP_DIR/AppRun" <<'EOF'
         #!/bin/bash
         HERE="$(dirname "$(readlink -f "$0")")"
-        exec "$HERE/usr/lib/kofre/bin/kofre" "$@"
+        exec "$HERE/usr/lib/gokfre/bin/gokfre" "$@"
         EOF
         chmod +x "$APP_DIR/AppRun"
 

@@ -1,6 +1,6 @@
 name: Build DMG
 
-description: Builds and uploads a macOS DMG for Kofre.
+description: Builds and uploads a macOS DMG for Gokfre.
 
 inputs:
   version:
@@ -22,18 +22,18 @@ runs:
     - name: Generate ICNS icon
       shell: bash
       run: |
-        mkdir -p kofre.iconset
-        sips -z 16 16     src/main/resources/kofre.png --out kofre.iconset/icon_16x16.png
-        sips -z 32 32     src/main/resources/kofre.png --out kofre.iconset/icon_16x16@2x.png
-        sips -z 32 32     src/main/resources/kofre.png --out kofre.iconset/icon_32x32.png
-        sips -z 64 64     src/main/resources/kofre.png --out kofre.iconset/icon_32x32@2x.png
-        sips -z 128 128   src/main/resources/kofre.png --out kofre.iconset/icon_128x128.png
-        sips -z 256 256   src/main/resources/kofre.png --out kofre.iconset/icon_128x128@2x.png
-        sips -z 256 256   src/main/resources/kofre.png --out kofre.iconset/icon_256x256.png
-        sips -z 512 512   src/main/resources/kofre.png --out kofre.iconset/icon_256x256@2x.png
-        sips -z 512 512   src/main/resources/kofre.png --out kofre.iconset/icon_512x512.png
-        sips -z 1024 1024 src/main/resources/kofre.png --out kofre.iconset/icon_512x512@2x.png
-        iconutil -c icns kofre.iconset -o src/main/resources/kofre.icns
+        mkdir -p gokfre.iconset
+        sips -z 16 16     src/main/resources/gokfre.png --out gokfre.iconset/icon_16x16.png
+        sips -z 32 32     src/main/resources/gokfre.png --out gokfre.iconset/icon_16x16@2x.png
+        sips -z 32 32     src/main/resources/gokfre.png --out gokfre.iconset/icon_32x32.png
+        sips -z 64 64     src/main/resources/gokfre.png --out gokfre.iconset/icon_32x32@2x.png
+        sips -z 128 128   src/main/resources/gokfre.png --out gokfre.iconset/icon_128x128.png
+        sips -z 256 256   src/main/resources/gokfre.png --out gokfre.iconset/icon_128x128@2x.png
+        sips -z 256 256   src/main/resources/gokfre.png --out gokfre.iconset/icon_256x256.png
+        sips -z 512 512   src/main/resources/gokfre.png --out gokfre.iconset/icon_256x256@2x.png
+        sips -z 512 512   src/main/resources/gokfre.png --out gokfre.iconset/icon_512x512.png
+        sips -z 1024 1024 src/main/resources/gokfre.png --out gokfre.iconset/icon_512x512@2x.png
+        iconutil -c icns gokfre.iconset -o src/main/resources/gokfre.icns
 
     - name: Build DMG
       shell: bash
@@ -44,8 +44,8 @@ runs:
       run: |
         mkdir -p build/artifacts
         ARCH="$(uname -m)"
-        cp "build/compose/binaries/main/dmg/Kofre-${{ inputs.version }}.dmg" \
-           "build/artifacts/Kofre-${{ inputs.version }}-${ARCH}.dmg"
+        cp "build/compose/binaries/main/dmg/Gokfre-${{ inputs.version }}.dmg" \
+           "build/artifacts/Gokfre-${{ inputs.version }}-${ARCH}.dmg"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4

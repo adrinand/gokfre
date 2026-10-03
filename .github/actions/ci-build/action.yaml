@@ -1,5 +1,5 @@
 name: Build and test
-description: Runs the kofre Gradle build and Rust library tests
+description: Runs the gokfre Gradle build and Rust library tests
 
 runs:
   using: composite
@@ -26,7 +26,7 @@ runs:
       if: runner.os == 'Linux'
       uses: Swatinem/rust-cache@v2
       with:
-        workspaces: lib/kofre-hotkey
+        workspaces: lib/gokfre-hotkey
 
     - name: Build and Test
       run: ./gradlew build --no-daemon
@@ -34,6 +34,6 @@ runs:
 
     - name: Run Rust lib tests
       if: runner.os == 'Linux'
-      working-directory: lib/kofre-hotkey
+      working-directory: lib/gokfre-hotkey
       run: cargo test
       shell: bash

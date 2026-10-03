@@ -74,11 +74,11 @@ complexity:
   CognitiveComplexMethod:
     active: true
     threshold: 15
-    excludes: ['**/kofre/ui/**']
+    excludes: ['**/gokfre/ui/**']
   ComplexCondition:
     active: true
     threshold: 3
-    excludes: ['**/kofre/ui/**']
+    excludes: ['**/gokfre/ui/**']
   ComplexInterface:
     active: true
     threshold: 10
@@ -101,7 +101,7 @@ complexity:
       - 'run'
       - 'use'
       - 'with'
-    excludes: ['**/kofre/ui/**']
+    excludes: ['**/gokfre/ui/**']
   LabeledExpression:
     active: false
     ignoredLabels: []
@@ -111,7 +111,7 @@ complexity:
   LongMethod:
     active: true
     threshold: 60
-    excludes: ['**/kofre/ui/**']
+    excludes: ['**/gokfre/ui/**']
   LongParameterList:
     active: true
     functionThreshold: 7
@@ -119,7 +119,7 @@ complexity:
     ignoreDefaultParameters: false
     ignoreDataClasses: true
     ignoreAnnotatedParameter: []
-    excludes: ['**/kofre/ui/**']
+    excludes: ['**/gokfre/ui/**']
   MethodOverloading:
     active: true
     threshold: 6
@@ -301,7 +301,7 @@ naming:
     forbiddenName: []
   FunctionNaming:
     active: true
-    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**', '**/kofre/ui/**']
+    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**', '**/gokfre/ui/**']
     functionPattern: '[a-z][a-zA-Z0-9]*'
     excludeClassPattern: '$^'
   FunctionParameterNaming:

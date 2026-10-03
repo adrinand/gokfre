@@ -48,8 +48,8 @@ dependencies {
     testImplementation("org.junit.vintage:junit-vintage-engine:5.10.1")
 }
 
-val rustDir = layout.projectDirectory.dir("lib/kofre-hotkey")
-val rustReleaseSo = rustDir.file("target/release/libkofre_hotkey.so")
+val rustDir = layout.projectDirectory.dir("lib/gokfre-hotkey")
+val rustReleaseSo = rustDir.file("target/release/libgokfre_hotkey.so")
 val rustLibsDir = layout.buildDirectory.dir("rust-libs")
 
 val buildRustRelease by tasks.registering(Exec::class) {
@@ -76,31 +76,31 @@ tasks.named<ProcessResources>("processResources") {
     if (isLinux) {
         from(rustReleaseSo) {
             into("linux-x86-64")
-            rename { "libkofre_hotkey.so" }
+            rename { "libgokfre_hotkey.so" }
         }
         from(rustReleaseSo) {
             into("linux-x86_64")
-            rename { "libkofre_hotkey.so" }
+            rename { "libgokfre_hotkey.so" }
         }
         from(rustReleaseSo) {
             into("linux-aarch64")
-            rename { "libkofre_hotkey.so" }
+            rename { "libgokfre_hotkey.so" }
         }
-        // Fallback location used by the manual extraction in KofreHotkeyNative
+        // Fallback location used by the manual extraction in GokfreHotkeyNative
         from(rustReleaseSo) {
             into("natives/linux-x86-64")
-            rename { "libkofre_hotkey.so" }
+            rename { "libgokfre_hotkey.so" }
         }
         from(rustReleaseSo) {
             into("natives/linux-aarch64")
-            rename { "libkofre_hotkey.so" }
+            rename { "libgokfre_hotkey.so" }
         }
     }
 }
 
 compose.desktop {
     application {
-        mainClass = "com.adrinand.kofre.MainKt"
+        mainClass = "com.adrinand.gokfre.MainKt"
         jvmArgs +=
             listOf(
                 "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
@@ -108,19 +108,19 @@ compose.desktop {
             )
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Rpm)
-            packageName = "kofre"
+            packageName = "gokfre"
             packageVersion = version.toString()
             description = "A keyboard-driven tiling window manager"
             copyright = "© 2026 adrinand"
             vendor = "adrinand"
 
             macOS {
-                bundleID = "com.adrinand.kofre"
-                iconFile.set(project.file("src/main/resources/kofre.icns"))
+                bundleID = "com.adrinand.gokfre"
+                iconFile.set(project.file("src/main/resources/gokfre.icns"))
             }
 
             linux {
-                iconFile.set(project.file("src/main/resources/kofre.png"))
+                iconFile.set(project.file("src/main/resources/gokfre.png"))
             }
         }
     }
@@ -139,18 +139,18 @@ kover {
                 // App bootstrap and OS-specific integration code: not unit-testable headless,
                 // covered by functional tests (core.screen) and per-OS integration tests (providers, window, tray).
                 classes(
-                    "com.adrinand.kofre.MainKt*",
-                    "com.adrinand.kofre.ComposableSingletons*",
-                    "com.adrinand.kofre.core.screen.*",
-                    "com.adrinand.kofre.core.hotkey.LinuxEvdevHotkeyProvider*",
-                    "com.adrinand.kofre.core.hotkey.JNativeHookProvider*",
-                    "com.adrinand.kofre.core.hotkey.KofreHotkeyNative*",
-                    "com.adrinand.kofre.core.hotkey.InputDevicePermissionChecker",
-                    "com.adrinand.kofre.ui.KofreWindowKt*",
-                    "com.adrinand.kofre.ui.KofreTrayKt*",
-                    "com.adrinand.kofre.ui.TrayIconKt*",
-                    "com.adrinand.kofre.ui.tray.*",
-                    "com.adrinand.kofre.ui.GlobalHotkeyRegistration*",
+                    "com.adrinand.gokfre.MainKt*",
+                    "com.adrinand.gokfre.ComposableSingletons*",
+                    "com.adrinand.gokfre.core.screen.*",
+                    "com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider*",
+                    "com.adrinand.gokfre.core.hotkey.JNativeHookProvider*",
+                    "com.adrinand.gokfre.core.hotkey.GokfreHotkeyNative*",
+                    "com.adrinand.gokfre.core.hotkey.InputDevicePermissionChecker",
+                    "com.adrinand.gokfre.ui.GokfreWindowKt*",
+                    "com.adrinand.gokfre.ui.GokfreTrayKt*",
+                    "com.adrinand.gokfre.ui.TrayIconKt*",
+                    "com.adrinand.gokfre.ui.tray.*",
+                    "com.adrinand.gokfre.ui.GlobalHotkeyRegistration*",
                 )
             }
         }
@@ -200,9 +200,9 @@ tasks.register<Exec>("installGnomeExtension") {
         "bash",
         "-c",
         """
-        install -d "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/kofre@adrinand"
-        cp -r extensions/gnome/kofre@adrinand/* "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/kofre@adrinand/"
-        echo "GNOME Shell extension installed. Log Out and enable it using: gnome-extensions enable kofre@adrinand"
+        install -d "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/gokfre@adrinand"
+        cp -r extensions/gnome/gokfre@adrinand/* "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/gokfre@adrinand/"
+        echo "GNOME Shell extension installed. Log Out and enable it using: gnome-extensions enable gokfre@adrinand"
         """.trimIndent(),
     )
 }
@@ -214,8 +214,8 @@ tasks.register<Exec>("installKdeScript") {
         "bash",
         "-c",
         """
-        install -d "${System.getProperty("user.home")}/.local/share/kwin/scripts/kofre.kwin"
-        cp -r extensions/kde/kofre.kwin/* "${System.getProperty("user.home")}/.local/share/kwin/scripts/kofre.kwin/"
+        install -d "${System.getProperty("user.home")}/.local/share/kwin/scripts/gokfre.kwin"
+        cp -r extensions/kde/gokfre.kwin/* "${System.getProperty("user.home")}/.local/share/kwin/scripts/gokfre.kwin/"
         echo "KDE KWin script installed. Enable it in KWin script settings."
         """.trimIndent(),
     )

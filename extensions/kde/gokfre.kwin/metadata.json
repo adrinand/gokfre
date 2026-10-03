@@ -1,0 +1,7 @@
+{
+  "KPackageStructure": "KWin/Script",
+  "Name": "Gokfre",
+  "Description": "Allows Gokfre to move and resize native Wayland windows on KDE Plasma.",
+  "Version": "1.0",
+  "Website": "https://github.com/adrinand/gokfre"
+}
