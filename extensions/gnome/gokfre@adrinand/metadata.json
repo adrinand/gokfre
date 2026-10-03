@@ -1,0 +1,19 @@
+{
+  "uuid": "gokfre@adrinand",
+  "name": "Gokfre Window Manager",
+  "description": "Allows Gokfre to move and resize native Wayland windows on GNOME.",
+  "version": 1,
+  "shell-version": [
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48"
+  ],
+  "url": "https://github.com/adrinand/gokfre",
+  "settings-schema": "org.gnome.shell.extensions.gokfre"
+}

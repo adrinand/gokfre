@@ -34,11 +34,11 @@ kls_database.db
 .idea/
 
 # Generated icons
-src/main/resources/kofre.icns
+src/main/resources/gokfre.icns
 *.iconset/
 
 # Rust
-lib/kofre-hotkey/target
+lib/gokfre-hotkey/target
 **/*.rs.bk
 *.pdb
 **/mutants.out*/
