@@ -2,6 +2,7 @@ package com.adrinand.gokfre.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -12,6 +13,9 @@ import androidx.compose.ui.window.isTraySupported
 import com.adrinand.gokfre.core.screen.isLinux
 import com.adrinand.gokfre.ui.tray.LinuxTrayManager
 import com.adrinand.gokfre.ui.tray.TrayController
+import java.util.logging.Logger
+
+private val logger = Logger.getLogger("com.adrinand.gokfre.ui.GokfreTray")
 
 private const val TRAY_TOOLTIP = "Gokfre"
 private const val SETTINGS_LABEL = "Settings"
@@ -24,6 +28,7 @@ fun ApplicationScope.GokfreTray(
     onSettings: () -> Unit,
 ) {
     if (isLinux()) {
+        LaunchedEffect(Unit) { logger.info { "Using Linux system tray backend" } }
         LinuxTray(onToggle, onSettings)
     } else {
         ComposeTray(icon, onToggle, onSettings)

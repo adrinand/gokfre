@@ -32,8 +32,10 @@ internal val kAXTitleAttribute = CFStringRef.createCFString("AXTitle")
 /**
  * Low-level mapping for macOS Accessibility/API (HIServices/ApplicationServices).
  */
-@Suppress("FunctionNaming", "ktlint:standard:function-naming")
+@Suppress("FunctionNaming", "ktlint:standard:function-naming", "ComplexInterface")
 internal interface ApplicationServices : Library {
+    fun AXIsProcessTrusted(): Byte
+
     fun AXUIElementCreateSystemWide(): AXUIElementRef
 
     fun AXUIElementCreateApplication(pid: Int): AXUIElementRef
@@ -91,6 +93,15 @@ internal fun release(reference: PointerType) {
         CFTypeRef(reference.pointer).release()
     }
 }
+
+/**
+ * Returns true when the current process has been granted the macOS
+ * Accessibility permission (System Settings > Privacy & Security > Accessibility).
+ */
+internal fun isAccessibilityTrusted(): Boolean =
+    runCatching { ApplicationServices.INSTANCE.AXIsProcessTrusted() != 0.toByte() }
+        .onFailure { logger.warning("Failed to check accessibility permission: ${it.message}") }
+        .getOrDefault(false)
 
 internal fun copyAttribute(
     app: ApplicationServices,

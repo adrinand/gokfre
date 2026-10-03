@@ -8,26 +8,32 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.application
 import com.adrinand.gokfre.core.comms.AppSocketComms
+import com.adrinand.gokfre.core.logging.AppLogging
 import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
 import com.adrinand.gokfre.core.screen.ArrangementController
 import com.adrinand.gokfre.core.screen.WindowManager
 import com.adrinand.gokfre.core.screen.createWindowManager
+import com.adrinand.gokfre.core.screen.isLinux
 import com.adrinand.gokfre.ui.GokfreTray
 import com.adrinand.gokfre.ui.GokfreWindow
 import com.adrinand.gokfre.ui.InputPermissionWarningDialog
+import com.adrinand.gokfre.ui.MacAccessibilityWarningWindow
 import com.adrinand.gokfre.ui.SettingsWindow
 import com.adrinand.gokfre.ui.createTrayIcon
 import com.adrinand.gokfre.ui.globalHotkeyRegistration
+import com.adrinand.gokfre.ui.openAccessibilitySettings
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
+import java.util.logging.Level
 import java.util.logging.Logger
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.Main")
 
 fun main() {
+    AppLogging.initialize()
     val settingsRequestChannel = Channel<Unit>(Channel.CONFLATED)
     val acquired =
         AppSocketComms.tryAcquireServer { command ->
@@ -37,6 +43,7 @@ fun main() {
         }
 
     if (!acquired) {
+        logger.info("Another gokfre instance is already running, exiting")
         return
     }
 
@@ -62,9 +69,13 @@ private fun runApplication(settingsRequestChannel: Channel<Unit>) {
 
         LaunchedEffect(Unit) {
             launch(Dispatchers.IO) {
-                val manager = createWindowManager()
-                windowManager = manager
-                arrangementController = ArrangementController(manager)
+                runCatching {
+                    val manager = createWindowManager()
+                    windowManager = manager
+                    arrangementController = ArrangementController(manager)
+                }.onFailure {
+                    logger.log(Level.SEVERE, "Failed to initialize window manager", it)
+                }
             }
             settingsRequestChannel.consumeEach { showSettings = true }
         }
@@ -76,6 +87,7 @@ private fun runApplication(settingsRequestChannel: Channel<Unit>) {
                     controller.captureTargetWindow()
                 }
                 isWindowVisible = !isWindowVisible
+                logger.info("Preview window visible=$isWindowVisible")
             } else {
                 logger.info { "Window manager not ready yet, ignoring toggle" }
             }
@@ -111,7 +123,14 @@ private fun runApplication(settingsRequestChannel: Channel<Unit>) {
         }
 
         if (showPermissionWarning) {
-            InputPermissionWarningDialog(onDismiss = { showPermissionWarning = false })
+            if (isLinux()) {
+                InputPermissionWarningDialog(onDismiss = { showPermissionWarning = false })
+            } else {
+                MacAccessibilityWarningWindow(
+                    onDismiss = { showPermissionWarning = false },
+                    onOpenSystemSettings = ::openAccessibilitySettings,
+                )
+            }
         }
     }
 }
