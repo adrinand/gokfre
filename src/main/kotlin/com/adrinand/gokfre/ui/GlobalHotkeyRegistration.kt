@@ -13,6 +13,7 @@ import com.adrinand.gokfre.core.hotkey.InputDevicePermissionChecker
 import com.adrinand.gokfre.core.hotkey.JNativeHookProvider
 import com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider
 import com.adrinand.gokfre.core.hotkey.toDisplayString
+import com.adrinand.gokfre.core.screen.isAccessibilityTrusted
 import com.adrinand.gokfre.core.screen.isLinux
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.flow.combine
@@ -71,6 +72,7 @@ private fun registerHotkeySafely(
     try {
         provider.register(hotkey) { SwingUtilities.invokeLater { onToggle() } }
         viewModel.registrationError = null
+        logger.info { "Registered hotkey: $hotkey" }
         hotkey
     } catch (e: IllegalStateException) {
         logger.warning("Failed to register hotkey $hotkey: ${e.message}")
@@ -85,8 +87,23 @@ private fun createGlobalHotkeyProvider(onPermissionMissing: () -> Unit): GlobalH
     when {
         GraphicsEnvironment.isHeadless() -> null
         isLinux() -> createLinuxProvider(onPermissionMissing)
-        else -> JNativeHookProvider()
+        else -> createMacProvider(onPermissionMissing)
     }
+
+private fun createMacProvider(onPermissionMissing: () -> Unit): GlobalHotkeyProvider? {
+    if (!isAccessibilityTrusted()) {
+        logger.warning("macOS accessibility permission not granted, skipping global hotkey registration")
+        onPermissionMissing()
+        return null
+    }
+    return runCatching { JNativeHookProvider() }
+        .onSuccess { logger.info { "Global hotkey provider initialized (JNativeHook)" } }
+        .onFailure {
+            logger.warning("Failed to initialize JNativeHook hotkey provider: ${it.message}")
+            onPermissionMissing()
+        }
+        .getOrNull()
+}
 
 private fun createLinuxProvider(onPermissionMissing: () -> Unit): GlobalHotkeyProvider? =
     try {
