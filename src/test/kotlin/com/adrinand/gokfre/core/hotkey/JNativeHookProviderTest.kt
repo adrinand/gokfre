@@ -12,6 +12,7 @@ import org.junit.Test
 import java.awt.GraphicsEnvironment
 import java.util.concurrent.atomic.AtomicBoolean
 
+@Suppress("TooManyFunctions")
 class JNativeHookProviderTest {
     @After
     fun tearDown() {
@@ -30,6 +31,96 @@ class JNativeHookProviderTest {
         )
 
         invoked.get() shouldBe true
+    }
+
+    @Test
+    fun `left meta modifier alone should invoke callback`() {
+        assumeProviderAvailable()
+        val invoked = AtomicBoolean(false)
+
+        provider!!.register(Hotkey.DEFAULT_TOGGLE) { invoked.set(true) }
+        simulateNativeKeyPress(
+            keyCode = NativeKeyEvent.VC_K,
+            modifiers = NativeKeyEvent.META_L_MASK,
+        )
+
+        invoked.get() shouldBe true
+    }
+
+    @Test
+    fun `right meta modifier alone should invoke callback`() {
+        assumeProviderAvailable()
+        val invoked = AtomicBoolean(false)
+
+        provider!!.register(Hotkey.DEFAULT_TOGGLE) { invoked.set(true) }
+        simulateNativeKeyPress(
+            keyCode = NativeKeyEvent.VC_K,
+            modifiers = NativeKeyEvent.META_R_MASK,
+        )
+
+        invoked.get() shouldBe true
+    }
+
+    @Test
+    fun `no modifiers should not invoke callback`() {
+        assumeProviderAvailable()
+        val invoked = AtomicBoolean(false)
+
+        provider!!.register(Hotkey.DEFAULT_TOGGLE) { invoked.set(true) }
+        simulateNativeKeyPress(
+            keyCode = NativeKeyEvent.VC_K,
+            modifiers = 0,
+        )
+
+        invoked.get() shouldBe false
+    }
+
+    @Test
+    fun `different key with meta should not invoke callback`() {
+        assumeProviderAvailable()
+        val invoked = AtomicBoolean(false)
+
+        provider!!.register(Hotkey.DEFAULT_TOGGLE) { invoked.set(true) }
+        simulateNativeKeyPress(
+            keyCode = NativeKeyEvent.VC_J,
+            modifiers = NativeKeyEvent.META_L_MASK,
+        )
+
+        invoked.get() shouldBe false
+    }
+
+    @Test
+    fun `extra modifier should not invoke callback`() {
+        assumeProviderAvailable()
+        val invoked = AtomicBoolean(false)
+
+        provider!!.register(Hotkey.DEFAULT_TOGGLE) { invoked.set(true) }
+        simulateNativeKeyPress(
+            keyCode = NativeKeyEvent.VC_K,
+            modifiers = NativeKeyEvent.META_L_MASK or NativeKeyEvent.CTRL_L_MASK,
+        )
+
+        invoked.get() shouldBe false
+    }
+
+    @Test
+    fun `missing modifier should not invoke callback`() {
+        assumeProviderAvailable()
+        val invoked = AtomicBoolean(false)
+
+        val hotkey =
+            Hotkey(
+                keyCode = NativeKeyEvent.VC_K,
+                modifiers = setOf(ModifierKey.SHIFT, ModifierKey.SUPER),
+            )
+        provider!!.register(hotkey) { invoked.set(true) }
+        simulateNativeKeyPress(
+            keyCode = NativeKeyEvent.VC_K,
+            modifiers = NativeKeyEvent.META_L_MASK,
+        )
+
+        invoked.get() shouldBe false
+        provider!!.unregister(hotkey)
     }
 
     @Test

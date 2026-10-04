@@ -8,12 +8,11 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Level
 import java.util.logging.Logger
 
+private val logger = Logger.getLogger("com.adrinand.gokfre.core.hotkey.JNativeHookProvider")
+
 class JNativeHookProvider : GlobalHotkeyProvider {
     private val registrations = ConcurrentHashMap<Hotkey, () -> Unit>()
     private val listener = ToggleListener()
-
-    private val Hotkey.modifierMask: Int
-        get() = modifiers.fold(0) { mask, modifier -> mask or modifier.toNativeMask() }
 
     init {
         Logger.getLogger(GlobalScreen::class.java.`package`.name).level = Level.WARNING
@@ -46,20 +45,29 @@ class JNativeHookProvider : GlobalHotkeyProvider {
     }
 
     private fun dispatch(event: NativeKeyEvent) {
+        logger.fine { "Native key event: keyCode=${event.keyCode} modifiers=${event.modifiers}" }
         for ((hotkey, callback) in registrations) {
-            if (event.keyCode == hotkey.keyCode && event.modifiers and hotkey.modifierMask == hotkey.modifierMask) {
+            if (hotkey.matches(event)) {
+                logger.fine { "Hotkey matched: $hotkey" }
                 callback.invoke()
                 return
             }
         }
     }
 
-    private fun ModifierKey.toNativeMask(): Int =
-        when (this) {
-            ModifierKey.SHIFT -> NativeKeyEvent.SHIFT_MASK
-            ModifierKey.CTRL -> NativeKeyEvent.CTRL_MASK
-            ModifierKey.ALT -> NativeKeyEvent.ALT_MASK
-            ModifierKey.SUPER -> NativeKeyEvent.META_MASK
+    private fun Hotkey.matches(event: NativeKeyEvent): Boolean {
+        if (event.keyCode != keyCode) {
+            return false
+        }
+        return event.presentModifiers() == modifiers
+    }
+
+    private fun NativeKeyEvent.presentModifiers(): Set<ModifierKey> =
+        buildSet {
+            if (modifiers and NativeKeyEvent.SHIFT_MASK != 0) add(ModifierKey.SHIFT)
+            if (modifiers and NativeKeyEvent.CTRL_MASK != 0) add(ModifierKey.CTRL)
+            if (modifiers and NativeKeyEvent.ALT_MASK != 0) add(ModifierKey.ALT)
+            if (modifiers and NativeKeyEvent.META_MASK != 0) add(ModifierKey.SUPER)
         }
 
     private inner class ToggleListener : NativeKeyListener {

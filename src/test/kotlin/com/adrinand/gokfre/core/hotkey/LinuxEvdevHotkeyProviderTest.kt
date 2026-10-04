@@ -25,4 +25,21 @@ class LinuxEvdevHotkeyProviderTest {
         invoked.get() shouldBe false
         provider.dispose()
     }
+
+    @Test
+    fun `register after unregister reinitializes native manager`() {
+        Assume.assumeTrue(System.getProperty("os.name").lowercase().contains("linux"))
+        Assume.assumeTrue(InputDevicePermissionChecker.hasInputDeviceAccess())
+
+        val provider = LinuxEvdevHotkeyProvider()
+        val hotkey =
+            Hotkey(
+                NativeKeyEvent.VC_K,
+                setOf(ModifierKey.SUPER),
+            )
+        provider.register(hotkey) { }
+        provider.unregister(hotkey)
+        provider.register(hotkey) { }
+        provider.dispose()
+    }
 }

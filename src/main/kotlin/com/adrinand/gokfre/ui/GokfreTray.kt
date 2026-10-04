@@ -31,6 +31,7 @@ fun ApplicationScope.GokfreTray(
         LaunchedEffect(Unit) { logger.info { "Using Linux system tray backend" } }
         LinuxTray(onToggle, onSettings)
     } else {
+        LaunchedEffect(Unit) { logger.info { "Using system tray backend (isTraySupported=$isTraySupported)" } }
         ComposeTray(icon, onToggle, onSettings)
     }
 }

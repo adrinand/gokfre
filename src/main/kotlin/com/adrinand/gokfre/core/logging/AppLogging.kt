@@ -5,6 +5,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.logging.FileHandler
+import java.util.logging.Filter
 import java.util.logging.Formatter
 import java.util.logging.Handler
 import java.util.logging.Level
@@ -27,6 +28,18 @@ object AppLogging {
     private const val MAX_LOG_FILES = 3
     private const val DEFAULT_VERSION = "dev"
 
+    private val NOISY_LOGGER_NAMES =
+        listOf(
+            "java.lang",
+            "java.awt",
+            "javax.swing",
+            "sun",
+            "com.sun.jna",
+            "org.jetbrains",
+            "androidx",
+            "kotlin",
+        )
+
     private val logger = Logger.getLogger("com.adrinand.gokfre.core.logging.AppLogging")
     private var fileHandler: Handler? = null
     private var logDir: Path? = null
@@ -47,10 +60,12 @@ object AppLogging {
                 FileHandler(pattern, MAX_LOG_BYTES, MAX_LOG_FILES, true).apply {
                     formatter = SingleLineFormatter()
                     level = Level.FINE
+                    filter = Filter { record -> !isRecordSilenced(record) }
                 }
             val rootLogger = Logger.getLogger("")
             rootLogger.level = Level.FINE
             rootLogger.addHandler(handler)
+            NOISY_LOGGER_NAMES.forEach { name -> Logger.getLogger(name).level = Level.WARNING }
             fileHandler = handler
             logDir = baseDir
         }.onFailure {
@@ -68,6 +83,7 @@ object AppLogging {
         fileHandler = null
         logDir = null
         Logger.getLogger("").level = Level.INFO
+        NOISY_LOGGER_NAMES.forEach { name -> Logger.getLogger(name).level = null }
         Thread.setDefaultUncaughtExceptionHandler(previousExceptionHandler)
         previousExceptionHandler = null
         isInitialized = false
@@ -107,6 +123,14 @@ object AppLogging {
     }
 
     private fun appVersion(): String = AppLogging::class.java.`package`?.implementationVersion ?: DEFAULT_VERSION
+
+    private fun isRecordSilenced(record: LogRecord): Boolean {
+        if (record.level.intValue() >= Level.WARNING.intValue()) {
+            return false
+        }
+        val name = record.loggerName ?: return false
+        return NOISY_LOGGER_NAMES.any { noisy -> name == noisy || name.startsWith("$noisy.") }
+    }
 }
 
 internal class SingleLineFormatter : Formatter() {
