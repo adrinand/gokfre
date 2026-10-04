@@ -15,16 +15,14 @@ class LinuxEvdevHotkeyProvider : GlobalHotkeyProvider {
     private var callback: GokfreHotkeyCallback? = null
 
     init {
-        val handle = GokfreHotkeyNative.INSTANCE.gokfre_hotkey_init()
-        check(handle != Pointer.NULL) { "Failed to initialize gokfre_hotkey native library" }
-        manager = handle
+        reinitialize()
     }
 
     override fun register(
         hotkey: Hotkey,
         callback: () -> Unit,
     ) {
-        val currentManager = manager ?: error("Hotkey provider has been shut down")
+        val currentManager = manager ?: reinitialize()
         val nativeCallback =
             object : GokfreHotkeyCallback {
                 override fun invoke() {
@@ -45,6 +43,13 @@ class LinuxEvdevHotkeyProvider : GlobalHotkeyProvider {
 
     override fun dispose() {
         shutdown()
+    }
+
+    private fun reinitialize(): Pointer {
+        val handle = GokfreHotkeyNative.INSTANCE.gokfre_hotkey_init()
+        check(handle != Pointer.NULL) { "Failed to initialize gokfre_hotkey native library" }
+        manager = handle
+        return handle
     }
 
     private fun shutdown() {

@@ -33,31 +33,35 @@ fun globalHotkeyRegistration(
 
     LaunchedEffect(Unit) {
         var previousHotkey = settingsViewModel.toggleHotkey
+        var registeredHotkey: Hotkey? = null
         combine(
             snapshotFlow { settingsViewModel.toggleHotkey },
             snapshotFlow { settingsViewModel.isHotkeyCaptureActive },
         ) { hotkey, capturing -> hotkey to capturing }
             .collect { (newHotkey, capturing) ->
-                hotkeyProvider?.dispose()
-                hotkeyProvider =
-                    if (capturing) {
-                        null
-                    } else {
-                        val provider = createGlobalHotkeyProvider(onPermissionMissing)
-                        if (provider != null) {
-                            previousHotkey =
-                                registerHotkeySafely(
-                                    provider = provider,
-                                    hotkey = newHotkey,
-                                    previousHotkey = previousHotkey,
-                                    onToggle = onToggle,
-                                    viewModel = settingsViewModel,
-                                )
-                        } else {
-                            previousHotkey = newHotkey
+                if (hotkeyProvider == null && !capturing) {
+                    hotkeyProvider = createGlobalHotkeyProvider(onPermissionMissing)
+                }
+                val provider = hotkeyProvider
+                registeredHotkey?.let { hotkey -> provider?.unregister(hotkey) }
+                registeredHotkey = null
+                when {
+                    provider == null -> if (!capturing) previousHotkey = newHotkey
+                    capturing -> Unit
+                    else -> {
+                        previousHotkey =
+                            registerHotkeySafely(
+                                provider = provider,
+                                hotkey = newHotkey,
+                                previousHotkey = previousHotkey,
+                                onToggle = onToggle,
+                                viewModel = settingsViewModel,
+                            )
+                        if (previousHotkey == newHotkey) {
+                            registeredHotkey = newHotkey
                         }
-                        provider
                     }
+                }
             }
     }
 }

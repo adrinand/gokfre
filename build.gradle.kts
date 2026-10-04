@@ -117,6 +117,13 @@ compose.desktop {
             macOS {
                 bundleID = "com.adrinand.gokfre"
                 iconFile.set(project.file("src/main/resources/gokfre.icns"))
+                infoPlist {
+                    extraKeysRawXml =
+                        """
+                        <key>LSUIElement</key>
+                        <true/>
+                        """.trimIndent()
+                }
             }
 
             linux {
