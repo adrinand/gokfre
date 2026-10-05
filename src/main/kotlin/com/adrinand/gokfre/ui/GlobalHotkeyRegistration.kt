@@ -1,6 +1,7 @@
 package com.adrinand.gokfre.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +64,13 @@ fun globalHotkeyRegistration(
                     }
                 }
             }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            hotkeyProvider?.dispose()
+            logger.info { "Global hotkey provider disposed" }
+        }
     }
 }
 

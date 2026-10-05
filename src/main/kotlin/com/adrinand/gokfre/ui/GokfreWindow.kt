@@ -183,6 +183,7 @@ fun GokfreWindow(
             logger.info { "LaunchedEffect: hiding preview" }
             previewReady = false
             win.focusableWindowState = false
+            win.isAlwaysOnTop = false
             return@LaunchedEffect
         }
 
@@ -191,6 +192,7 @@ fun GokfreWindow(
         }
         win.bounds = win.workAreaBounds()
         win.setOpacitySafely(0f)
+        win.isAlwaysOnTop = true
         var waitedMs = 0L
         while (!win.isShowing && waitedMs < MAX_SHOW_WAIT_MS) {
             delay(SHOW_POLL_INTERVAL_MS.milliseconds)
