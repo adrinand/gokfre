@@ -3,6 +3,7 @@ package com.adrinand.gokfre.core.screen
 import com.sun.jna.Library
 import com.sun.jna.Memory
 import com.sun.jna.Native
+import com.sun.jna.NativeLibrary
 import com.sun.jna.Pointer
 import com.sun.jna.PointerType
 import com.sun.jna.platform.mac.CoreFoundation.CFStringRef
@@ -16,18 +17,17 @@ private val logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacAccess
 internal const val AX_ERROR_SUCCESS = 0
 internal const val AX_VALUE_CGPOINT_TYPE = 1
 internal const val AX_VALUE_CGSIZE_TYPE = 2
-
 internal const val POSITION_MEMORY_SIZE = 16L
 internal const val SIZE_MEMORY_SIZE = 16L
 internal const val COORDINATE_X_OFFSET = 0L
 internal const val COORDINATE_Y_OFFSET = 8L
-
 internal val kAXFocusedApplicationAttribute = CFStringRef.createCFString("AXFocusedApplication")
 internal val kAXFocusedWindowAttribute = CFStringRef.createCFString("AXFocusedWindow")
 internal val kAXPositionAttribute = CFStringRef.createCFString("AXPosition")
 internal val kAXSizeAttribute = CFStringRef.createCFString("AXSize")
 internal val kAXRaiseAction = CFStringRef.createCFString("AXRaise")
 internal val kAXTitleAttribute = CFStringRef.createCFString("AXTitle")
+internal val kAXFrontmostAttribute = CFStringRef.createCFString("AXFrontmost")
 
 /**
  * Low-level mapping for macOS Accessibility/API (HIServices/ApplicationServices).
@@ -94,14 +94,33 @@ internal fun release(reference: PointerType) {
     }
 }
 
-/**
- * Returns true when the current process has been granted the macOS
- * Accessibility permission (System Settings > Privacy & Security > Accessibility).
- */
 internal fun isAccessibilityTrusted(): Boolean =
     runCatching { ApplicationServices.INSTANCE.AXIsProcessTrusted() != 0.toByte() }
         .onFailure { logger.warning("Failed to check accessibility permission: ${it.message}") }
         .getOrDefault(false)
+
+internal fun focusAppWindow(): Boolean =
+    runCatching {
+        val app = ApplicationServices.INSTANCE
+        val appElement = app.AXUIElementCreateApplication(ProcessHandle.current().pid().toInt())
+        if (appElement.pointer == null) {
+            logger.warning { "Could not create AX application element for this process" }
+            false
+        } else {
+            try {
+                val error = app.AXUIElementSetAttributeValue(appElement, kAXFrontmostAttribute, cfBooleanTrue())
+                if (error == AX_ERROR_SUCCESS) {
+                    logger.info { "Brought the application forward for preview focus" }
+                    true
+                } else {
+                    logger.warning { "Setting AXFrontmost failed with error $error" }
+                    false
+                }
+            } finally {
+                release(appElement)
+            }
+        }
+    }.onFailure { logger.warning { "Failed to activate this application: ${it.message}" } }.getOrDefault(false)
 
 internal fun copyAttribute(
     app: ApplicationServices,
@@ -195,3 +214,8 @@ internal fun setSize(
         release(value)
     }
 }
+
+private fun cfBooleanTrue(): Pointer =
+    NativeLibrary.getInstance("CoreFoundation")
+        .getGlobalVariableAddress("kCFBooleanTrue")
+        .getPointer(0)

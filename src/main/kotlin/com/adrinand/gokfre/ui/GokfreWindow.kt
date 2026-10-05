@@ -25,6 +25,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.Window
 import com.adrinand.gokfre.core.hotkey.getDisplayCharFromKeyEvent
 import com.adrinand.gokfre.core.screen.ArrangementController
+import com.adrinand.gokfre.core.screen.focusAppWindow
 import com.adrinand.gokfre.core.screen.isLinux
 import com.adrinand.gokfre.core.screen.isX11Session
 import com.adrinand.gokfre.core.screen.skipTaskbarX11
@@ -202,6 +203,9 @@ fun GokfreWindow(
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
         win.focusableWindowState = true
+        if (!isLinux()) {
+            focusAppWindow()
+        }
         win.toFront()
         win.requestFocus()
         focusRequester.requestFocus()
