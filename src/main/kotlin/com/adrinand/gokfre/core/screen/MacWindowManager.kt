@@ -74,10 +74,7 @@ class MacWindowManager : SingleBackendWindowManager<WindowHandle.Mac>() {
     override suspend fun enterFullscreen(
         window: Window,
         timeoutMs: Long,
-    ): Boolean {
-        AwtFullscreen.setFullscreen(window)
-        return true
-    }
+    ): Boolean = true
 
     private fun buildMacHandle(systemWide: AXUIElementRef): WindowHandle.Mac? {
         val focusedAppPointer = copyAttribute(app, systemWide, kAXFocusedApplicationAttribute) ?: return null
