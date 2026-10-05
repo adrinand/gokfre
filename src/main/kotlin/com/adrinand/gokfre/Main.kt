@@ -57,7 +57,7 @@ private fun runApplication(settingsRequestChannel: Channel<Unit>) {
             .onFailure { logger.warning("Failed to initialize settings repository: ${it.message}") }
             .getOrNull()
 
-    application(exitProcessOnExit = false) {
+    application(exitProcessOnExit = true) {
         val settingsCoroutineScope = rememberCoroutineScope()
         val settingsViewModel = remember { SettingsViewModel(settingsCoroutineScope, settingsRepository) }
         var windowManager by remember { mutableStateOf<WindowManager?>(null) }
