@@ -32,6 +32,7 @@ import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.util.logging.Logger
@@ -135,7 +136,7 @@ fun GokfreWindow(
                 window.skipTaskbarX11()
             }
 
-            window.opacity = 0f
+            window.setOpacitySafely(0f)
             window.bounds = window.workAreaBounds()
             window.focusableWindowState = false
         }
@@ -189,7 +190,7 @@ fun GokfreWindow(
             "LaunchedEffect: showing preview, isVisible=${win.isVisible}, isShowing=${win.isShowing}"
         }
         win.bounds = win.workAreaBounds()
-        win.opacity = 0f
+        win.setOpacitySafely(0f)
         var waitedMs = 0L
         while (!win.isShowing && waitedMs < MAX_SHOW_WAIT_MS) {
             delay(SHOW_POLL_INTERVAL_MS.milliseconds)
@@ -202,11 +203,16 @@ fun GokfreWindow(
         win.toFront()
         win.requestFocus()
         focusRequester.requestFocus()
-        win.opacity = 1f
+        win.setOpacitySafely(1f)
         previewReady = true
 
         win.isResizable = true
         arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
         win.isResizable = false
     }
+}
+
+internal fun Window.setOpacitySafely(value: Float) {
+    runCatching { opacity = value }
+        .onFailure { logger.warning { "Could not set opacity to $value: $it" } }
 }

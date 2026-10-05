@@ -8,6 +8,7 @@ import com.sun.jna.ptr.NativeLongByReference
 import com.sun.jna.ptr.PointerByReference
 import kotlinx.coroutines.delay
 import java.awt.Window
+import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -25,6 +26,7 @@ private data class X11Data(
  * for the Gokfre preview window.
  */
 object X11Fullscreen {
+    private val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.X11Fullscreen")
     private const val NET_WM_STATE_REMOVE = 0L
     private const val NET_WM_STATE_ADD = 1L
     private const val NO_DATA = 0L
@@ -53,14 +55,14 @@ object X11Fullscreen {
         val x11 = X11.INSTANCE
         val display = x11.XOpenDisplay(null)
         if (display == null) {
-            AwtFullscreen.setFullscreen(window)
+            logger.info { "X11 display unavailable; preview keeps its work-area bounds" }
             return
         }
         try {
             val atoms = extractX11Data(x11, display)
             val windowId = resolveWindowId(x11, display, atoms, window)
             if (windowId == null) {
-                AwtFullscreen.setFullscreen(window)
+                logger.info { "Could not resolve preview window id; preview keeps its work-area bounds" }
                 return
             }
             requestMaximizeState(atoms, windowId, add = false)

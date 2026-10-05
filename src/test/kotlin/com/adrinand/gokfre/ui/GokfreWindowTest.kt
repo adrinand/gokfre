@@ -11,7 +11,9 @@ import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.awt.Frame
 import java.awt.GraphicsEnvironment
+import java.awt.IllegalComponentStateException
 
 class GokfreWindowTest {
     @get:Rule
@@ -39,5 +41,17 @@ class GokfreWindowTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("layout-preview").assertExists()
+    }
+
+    @Test
+    fun `setOpacitySafely swallows full-screen opacity failures`() {
+        val frame =
+            object : Frame() {
+                override fun setOpacity(opacity: Float) {
+                    throw IllegalComponentStateException("Setting opacity for full-screen window is not supported.")
+                }
+            }
+
+        frame.setOpacitySafely(1f)
     }
 }
