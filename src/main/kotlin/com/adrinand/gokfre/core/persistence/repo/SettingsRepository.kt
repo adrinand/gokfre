@@ -29,7 +29,7 @@ private val json =
         encodeDefaults = true
     }
 
-class SettingsRepository internal constructor(
+class SettingsRepository(
     private val settingsPath: Path,
 ) {
     constructor() : this(resolveDefaultPath())

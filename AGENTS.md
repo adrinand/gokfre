@@ -1,0 +1,106 @@
+# AGENTS.md — gokfre
+
+## Project overview
+
+gokfre is a keyboard-driven tiling window manager for Linux (X11 / Wayland) and
+macOS. The user presses a global hotkey (default Super+K) to open a preview
+window, then selects one or two tile keys to arrange the currently focused
+window.
+
+## Stack
+
+- **Language:** Kotlin 2.0.20 on JVM 17+.
+- **UI:** JetBrains Compose Desktop 1.7.3.
+- **Build:** Gradle 9 with Kotlin DSL.
+- **State:** Compose `mutableStateOf` / `SnapshotStateList`, persisted as JSON
+  via kotlinx.serialization.
+- **Native interop:** JNA for platform APIs; Rust `kbd-global` crate for Linux
+  evdev global hotkeys.
+- **Testing:** Kotest + JUnit 4 (Compose UI tests via `createComposeRule`),
+  plus real-desktop E2E tests under `src/e2e/kotlin`.
+
+## Project layout
+
+```
+src/main/kotlin/com/adrinand/gokfre/
+  Main.kt                 # App bootstrap and single-instance socket.
+  ui/                     # Compose screens, windows, tray, settings UI.
+  viewmodel/              # SettingsViewModel + AppLayoutSettings.
+  core/screen/            # WindowManager abstraction + OS backends.
+  core/hotkey/            # Global hotkey abstraction + providers.
+  core/persistence/       # SettingsRepository + serialized entities.
+  core/comms/             # Unix-domain socket single-instance handshake.
+  core/logging/           # AppLogging initialization.
+lib/gokfre-hotkey/        # Rust library for Linux evdev hotkeys.
+extensions/               # GNOME Shell extension + KDE KWin script.
+```
+
+## Build and test commands
+
+```bash
+# Run the app locally.
+./gradlew run
+
+# Full CI-quality verification (unit tests, detekt, ktlint, kover coverage).
+# Does NOT run E2E tests.
+./gradlew check
+
+# Rust hotkey library tests (Linux only).
+cd lib/gokfre-hotkey && cargo test
+
+# Real-desktop end-to-end tests (skipped automatically in headless environments).
+# On Wayland, arrangement tests need the GNOME/KDE helper extension/script
+# enabled and xdotool installed to activate the target window.
+./gradlew e2e
+
+# Build packages for the host OS.
+./gradlew package
+```
+
+## Agentic pre-PR workflow
+
+This repo is configured for opencode:
+
+- `AGENTS.md` and `REVIEW.md` are loaded as instructions.
+- `/pre-pr` runs verification (`./gradlew check`, `cargo test`, `./gradlew e2e`)
+  and then code + security review.
+- `/review` re-runs code and security review only.
+- Review agents are read-only (`edit: deny`); the parent agent decides what to fix.
+
+## Conventions
+
+- Package: `com.adrinand.gokfre.*`.
+- Use `java.util.logging` via the project logger; never `println` in production.
+- UI composables live in `ui.*`; business logic in `viewmodel.*` or `core.*`.
+- OS-specific code is isolated behind interfaces (`WindowManager`,
+  `GlobalHotkeyProvider`).
+- Prefer immutable value objects for persistence; use `SnapshotStateList` only
+  for Compose-bound mutable UI state.
+- Keep composables focused; extract reusable components to small files.
+
+## Things that are easy to break
+
+- **OS window management:** Changes in `core/screen/` can break X11, Wayland,
+  or macOS behavior. Always test on the target OS. E2E arrangement tests run
+  on X11 and on Wayland GNOME/KDE when the helper extension/script is enabled;
+  GNOME disables extensions while the screen is locked, which makes the
+  arrangement test fail with a clear message.
+- **Global hotkeys:** Linux evdev needs `/dev/input/event*` and `/dev/uinput`
+  access. The Rust native lib must be rebuilt after changes.
+- **Single-instance socket:** `AppSocketComms` uses a fixed Unix socket path
+  under `/tmp`. Tests use isolated settings paths but share the socket logic.
+- **Settings persistence:** `SettingsRepository` auto-saves with a 500ms
+  debounce. Closing the app too fast in tests can lose changes.
+- **Tray icon:** Linux uses dorkbox/SystemTray with AppIndicator. Can fail
+  silently on headless or unsupported desktops.
+
+## Non-goals
+
+- Do not add a web UI or remote control API.
+- Do not support Windows in this repo.
+- Do not replace the OS compositor; gokfre is a helper, not a WM server.
+
+## When editing this file
+
+Update this file when you change the stack, build commands, or project
+structure. Reviewers should flag changes that make a line here out of date.

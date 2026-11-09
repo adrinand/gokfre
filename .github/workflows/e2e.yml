@@ -1,0 +1,65 @@
+name: E2E Tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (${{ matrix.environment }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: linux-gnome
+            runner: ubuntu-latest
+            setup-script: setup-e2e-linux-gnome.sh
+          - environment: linux-kde
+            runner: ubuntu-latest
+            setup-script: setup-e2e-linux-kde.sh
+          - environment: macos-silicon
+            runner: macos-latest
+            setup-script: setup-e2e-macos.sh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Rust (Linux)
+        if: runner.os == 'Linux'
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Set up desktop environment
+        run: bash .github/scripts/${{ matrix.setup-script }}
+
+      - name: Run E2E tests
+        run: ./gradlew e2e --no-daemon --stacktrace
+        env:
+          XDG_SESSION_TYPE: ${{ env.XDG_SESSION_TYPE }}
+          XDG_CURRENT_DESKTOP: ${{ env.XDG_CURRENT_DESKTOP }}
+          WAYLAND_DISPLAY: ${{ env.WAYLAND_DISPLAY }}
+          DISPLAY: ${{ env.DISPLAY }}
+
+      - name: Upload E2E reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports-${{ matrix.environment }}
+          path: |
+            build/reports/tests/e2e/
+            build/test-results/e2e/
+            lib/gokfre-hotkey/target/
+          if-no-files-found: ignore

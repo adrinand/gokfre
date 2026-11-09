@@ -8,6 +8,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.application
 import com.adrinand.gokfre.core.comms.AppSocketComms
+import com.adrinand.gokfre.core.hotkey.GlobalHotkeyProvider
 import com.adrinand.gokfre.core.logging.AppLogging
 import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
 import com.adrinand.gokfre.core.screen.ArrangementController
@@ -29,6 +30,7 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import java.util.logging.Level
 import java.util.logging.Logger
+import javax.swing.SwingUtilities
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.Main")
 
@@ -47,19 +49,32 @@ fun main() {
         return
     }
 
-    runApplication(settingsRequestChannel)
+    runGokfreApplication(settingsRequestChannel)
 }
 
-@Suppress("LongMethod", "CognitiveComplexMethod")
-private fun runApplication(settingsRequestChannel: Channel<Unit>) {
-    val settingsRepository =
-        runCatching { SettingsRepository() }
-            .onFailure { logger.warning("Failed to initialize settings repository: ${it.message}") }
-            .getOrNull()
+@Suppress("LongMethod", "CognitiveComplexMethod", "LongParameterList")
+fun runGokfreApplication(
+    settingsRequestChannel: Channel<Unit>,
+    exitProcessOnExit: Boolean = true,
+    onReady: () -> Unit = {},
+    onViewModelCreated: (SettingsViewModel) -> Unit = {},
+    shutdownChannel: Channel<Unit> = Channel(),
+    settingsRepository: SettingsRepository? = null,
+    globalHotkeyProvider: GlobalHotkeyProvider? = null,
+    toggleDispatcher: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
+) {
+    val effectiveSettingsRepository =
+        settingsRepository
+            ?: runCatching { SettingsRepository() }
+                .onFailure { logger.warning("Failed to initialize settings repository: ${it.message}") }
+                .getOrNull()
 
-    application(exitProcessOnExit = true) {
+    application(exitProcessOnExit = exitProcessOnExit) {
         val settingsCoroutineScope = rememberCoroutineScope()
-        val settingsViewModel = remember { SettingsViewModel(settingsCoroutineScope, settingsRepository) }
+        val settingsViewModel = remember { SettingsViewModel(settingsCoroutineScope, effectiveSettingsRepository) }
+        LaunchedEffect(settingsViewModel) {
+            onViewModelCreated(settingsViewModel)
+        }
         var windowManager by remember { mutableStateOf<WindowManager?>(null) }
         var arrangementController by remember { mutableStateOf<ArrangementController?>(null) }
         var isWindowVisible by remember { mutableStateOf(false) }
@@ -68,11 +83,16 @@ private fun runApplication(settingsRequestChannel: Channel<Unit>) {
         val trayIcon = remember { createTrayIcon() }
 
         LaunchedEffect(Unit) {
+            launch {
+                shutdownChannel.receive()
+                exitApplication()
+            }
             launch(Dispatchers.IO) {
                 runCatching {
                     val manager = createWindowManager()
                     windowManager = manager
                     arrangementController = ArrangementController(manager)
+                    onReady()
                 }.onFailure {
                     logger.log(Level.SEVERE, "Failed to initialize window manager", it)
                 }
@@ -97,6 +117,8 @@ private fun runApplication(settingsRequestChannel: Channel<Unit>) {
             settingsViewModel = settingsViewModel,
             onPermissionMissing = { showPermissionWarning = true },
             onToggle = toggleWindow,
+            globalHotkeyProvider = globalHotkeyProvider,
+            toggleDispatcher = toggleDispatcher,
         )
 
         arrangementController?.let { controller ->

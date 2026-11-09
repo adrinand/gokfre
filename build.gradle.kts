@@ -19,6 +19,14 @@ plugins {
     alias(libs.plugins.kover)
 }
 
+sourceSets {
+    create("e2e") {
+        kotlin.srcDir("src/e2e/kotlin")
+        compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output + configurations.testRuntimeClasspath.get()
+        runtimeClasspath += sourceSets.main.get().output + sourceSets.test.get().output + configurations.testRuntimeClasspath.get()
+    }
+}
+
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.jna.platform)
@@ -46,6 +54,9 @@ dependencies {
 
     // Allows JUnit4 tests to run on the JUnit5 platform
     testImplementation("org.junit.vintage:junit-vintage-engine:5.10.1")
+
+    // E2E tests use JUnit Jupiter directly.
+    add("e2eImplementation", "org.junit.jupiter:junit-jupiter:5.10.1")
 }
 
 val rustDir = layout.projectDirectory.dir("lib/gokfre-hotkey")
@@ -140,6 +151,14 @@ detekt {
 }
 
 kover {
+    currentProject {
+        instrumentation {
+            disabledForTestTasks.add("e2e")
+        }
+        sources {
+            excludedSourceSets.add("e2e")
+        }
+    }
     reports {
         filters {
             excludes {
@@ -189,6 +208,14 @@ tasks {
 
     named("check") {
         dependsOn("ktlintCheck", "detekt", "test", "koverVerify")
+    }
+
+    val e2e by registering(Test::class) {
+        description = "Runs end-to-end tests that require a real desktop environment"
+        group = "verification"
+        testClassesDirs = sourceSets["e2e"].output.classesDirs
+        classpath = sourceSets["e2e"].runtimeClasspath
+        shouldRunAfter("test")
     }
 }
 
