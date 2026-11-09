@@ -7,6 +7,7 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+echo "Installing KDE desktop stack..."
 sudo apt-get update
 
 # Core desktop stack. kwin-wayland is the KDE compositor; plasma-workspace
@@ -19,6 +20,7 @@ sudo apt-get install -y \
     xwayland \
     x11-utils \
     procps \
+    libglib2.0-bin \
     xdotool \
     libgl1-mesa-dri \
     libayatana-appindicator3-1 \
@@ -42,30 +44,38 @@ export XDG_CURRENT_DESKTOP=KDE
 # it so it survives the end of this workflow step (GitHub Actions reaps
 # orphaned processes). The scripting engine is part of KWin, which gokfre
 # drives over org.kde.KWin.Scripting.
+echo "Starting kwin_wayland (virtual backend)..."
 RUNNER_TRACKING_ID="" KWIN_COMPOSE=Q setsid kwin_wayland \
     --virtual --xwayland --width 1920 --height 1080 \
     > /tmp/kwin.log 2>&1 < /dev/null &
 KWIN_PID=$!
 
-wait_for_wayland_socket() {
-    local sock
-    for _ in $(seq 1 60); do
-        for sock in "$XDG_RUNTIME_DIR"/wayland-*; do
-            if [ -S "$sock" ] && [ -w "$sock" ]; then
-                basename "$sock"
-                return 0
-            fi
-        done
-        sleep 0.5
-    done
-    return 1
-}
-
-if ! WAYLAND_SOCK="$(wait_for_wayland_socket)"; then
-    echo "ERROR: KWin did not create a Wayland socket"
+fail_with_log() {
+    echo "ERROR: $1"
     cat /tmp/kwin.log || true
     kill "$KWIN_PID" 2>/dev/null || true
     exit 1
+}
+
+WAIT_ATTEMPTS=60
+WAIT_INTERVAL=0.5
+
+WAYLAND_SOCK=""
+for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
+    if ! kill -0 "$KWIN_PID" 2>/dev/null; then
+        fail_with_log "KWin exited before creating a Wayland socket"
+    fi
+    for sock in "$XDG_RUNTIME_DIR"/wayland-*; do
+        if [ -S "$sock" ] && [ -w "$sock" ]; then
+            WAYLAND_SOCK="$(basename "$sock")"
+            break 2
+        fi
+    done
+    sleep "$WAIT_INTERVAL"
+done
+
+if [ -z "$WAYLAND_SOCK" ]; then
+    fail_with_log "KWin did not create a Wayland socket"
 fi
 
 echo "KWin running on Wayland socket $WAYLAND_SOCK (PID $KWIN_PID)"
@@ -73,72 +83,58 @@ echo "KWin running on Wayland socket $WAYLAND_SOCK (PID $KWIN_PID)"
 # KWin starts Xwayland rootless with "-displayfd" and no explicit ":N", so the
 # display number must be discovered by probing. It only passes "-auth" when
 # launched with --xwayland-xauthority; honour it if present.
-wait_for_xwayland() {
-    for _ in $(seq 1 60); do
-        if pgrep -x Xwayland >/dev/null 2>&1; then
-            return 0
-        fi
-        sleep 0.5
-    done
-    return 1
-}
+echo "Waiting for Xwayland..."
+XWAYLAND_PID=""
+for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
+    XWAYLAND_PID="$(pgrep -x Xwayland 2>/dev/null | head -n1 || true)"
+    if [ -n "$XWAYLAND_PID" ]; then
+        break
+    fi
+    if ! kill -0 "$KWIN_PID" 2>/dev/null; then
+        fail_with_log "KWin exited before Xwayland started"
+    fi
+    sleep "$WAIT_INTERVAL"
+done
 
-xwayland_auth_file() {
-    local pid args
-    for pid in $(pgrep -x Xwayland 2>/dev/null || true); do
-        args="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
-        printf '%s' "$args" | grep -oE '\-auth [^ ]+' | head -n1 | cut -d' ' -f2 || true
-        return 0
-    done
-    return 0
-}
-
-find_x11_display() {
-    local n
-    for n in $(seq 0 9); do
-        if [ -S "/tmp/.X11-unix/X$n" ] && xdpyinfo -display ":$n" >/dev/null 2>&1; then
-            echo ":$n"
-            return 0
-        fi
-    done
-    return 1
-}
-
-if ! wait_for_xwayland; then
-    echo "ERROR: Xwayland did not start"
-    cat /tmp/kwin.log || true
-    kill "$KWIN_PID" 2>/dev/null || true
-    exit 1
+if [ -z "$XWAYLAND_PID" ]; then
+    fail_with_log "Xwayland did not start"
 fi
 
-XAUTHORITY_PATH="$(xwayland_auth_file || true)"
+XAUTHORITY_PATH=""
+XWAYLAND_CMDLINE="$(tr '\0' ' ' < "/proc/$XWAYLAND_PID/cmdline" 2>/dev/null || true)"
+XAUTHORITY_PATH="$(printf '%s' "$XWAYLAND_CMDLINE" | grep -oE '\-auth [^ ]+' | head -n1 | cut -d' ' -f2 || true)"
 if [ -n "$XAUTHORITY_PATH" ]; then
     export XAUTHORITY="$XAUTHORITY_PATH"
 fi
 
+echo "Probing for the XWayland display..."
 DISPLAY_NUM=""
-for _ in $(seq 1 60); do
-    if DISPLAY_NUM="$(find_x11_display)"; then
-        break
+for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
+    if ! kill -0 "$KWIN_PID" 2>/dev/null; then
+        fail_with_log "KWin exited before exposing an XWayland display"
     fi
-    sleep 0.5
+    for n in $(seq 0 9); do
+        if [ -S "/tmp/.X11-unix/X$n" ] && timeout 5 xdpyinfo -display ":$n" >/dev/null 2>&1; then
+            DISPLAY_NUM=":$n"
+            break 2
+        fi
+    done
+    sleep "$WAIT_INTERVAL"
 done
 
 if [ -z "$DISPLAY_NUM" ]; then
-    echo "ERROR: XWayland display not found"
-    cat /tmp/kwin.log || true
+    echo "X11 sockets:"
     ls -la /tmp/.X11-unix || true
+    echo "Xwayland processes:"
     pgrep -a Xwayland || true
-    kill "$KWIN_PID" 2>/dev/null || true
-    exit 1
+    fail_with_log "XWayland display not found"
 fi
 
 export DISPLAY="$DISPLAY_NUM"
+echo "Using XWayland display $DISPLAY_NUM"
 
-if ! xdpyinfo >/dev/null 2>&1; then
-    echo "ERROR: xdpyinfo failed for DISPLAY=$DISPLAY (XAUTHORITY=${XAUTHORITY:-})"
-    cat /tmp/kwin.log || true
-    exit 1
+if ! timeout 5 xdpyinfo >/dev/null 2>&1; then
+    fail_with_log "xdpyinfo failed for DISPLAY=$DISPLAY (XAUTHORITY=${XAUTHORITY:-})"
 fi
 
 # Persist environment variables for subsequent workflow steps.
@@ -157,20 +153,21 @@ fi
 
 # Verify KWin's scripting D-Bus interface is reachable. gokfre uses it to run
 # short window-management scripts.
+echo "Checking KWin scripting D-Bus interface..."
 service_ready=0
-for _ in $(seq 1 60); do
-    if gdbus introspect --session --dest org.kde.KWin --object-path /Scripting >/dev/null 2>&1; then
+for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
+    if timeout 10 gdbus introspect --session --dest org.kde.KWin --object-path /Scripting >/dev/null 2>&1; then
         service_ready=1
         break
     fi
-    sleep 0.5
+    if ! kill -0 "$KWIN_PID" 2>/dev/null; then
+        fail_with_log "KWin exited before exposing its scripting interface"
+    fi
+    sleep "$WAIT_INTERVAL"
 done
 
 if [ "$service_ready" -ne 1 ]; then
-    echo "ERROR: KWin scripting D-Bus interface is not reachable"
-    cat /tmp/kwin.log || true
-    kill "$KWIN_PID" 2>/dev/null || true
-    exit 1
+    fail_with_log "KWin scripting D-Bus interface is not reachable"
 fi
 
 echo "KWin scripting D-Bus interface is available"

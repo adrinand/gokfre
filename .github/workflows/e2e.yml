@@ -11,6 +11,7 @@ jobs:
   e2e:
     name: E2E (${{ matrix.environment }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -43,9 +44,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Set up desktop environment
+        timeout-minutes: 15
         run: bash .github/scripts/${{ matrix.setup-script }}
 
       - name: Run E2E tests
+        timeout-minutes: 20
         run: ./gradlew e2e --no-daemon --stacktrace
 
       - name: Show E2E failures
@@ -66,4 +69,6 @@ jobs:
             build/reports/tests/e2e/
             build/test-results/e2e/
             lib/gokfre-hotkey/target/
+            /tmp/kwin.log
+            /tmp/gnome-shell.log
           if-no-files-found: ignore
