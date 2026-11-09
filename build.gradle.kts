@@ -33,6 +33,8 @@ dependencies {
     implementation(libs.jnativehook)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.dorkbox.systemtray)
+    implementation(libs.dbus.java.core)
+    implementation(libs.dbus.java.transport.native.unixsocket)
     runtimeOnly(libs.slf4j.nop)
 
     // Kotest (unit tests)
@@ -237,20 +239,6 @@ tasks.register<Exec>("installGnomeExtension") {
         install -d "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/gokfre@adrinand"
         cp -r extensions/gnome/gokfre@adrinand/* "${System.getProperty("user.home")}/.local/share/gnome-shell/extensions/gokfre@adrinand/"
         echo "GNOME Shell extension installed. Log Out and enable it using: gnome-extensions enable gokfre@adrinand"
-        """.trimIndent(),
-    )
-}
-
-tasks.register<Exec>("installKdeScript") {
-    group = "distribution"
-    description = "Installs the KDE KWin script for native Wayland support"
-    commandLine(
-        "bash",
-        "-c",
-        """
-        install -d "${System.getProperty("user.home")}/.local/share/kwin/scripts/gokfre.kwin"
-        cp -r extensions/kde/gokfre.kwin/* "${System.getProperty("user.home")}/.local/share/kwin/scripts/gokfre.kwin/"
-        echo "KDE KWin script installed. Enable it in KWin script settings."
         """.trimIndent(),
     )
 }

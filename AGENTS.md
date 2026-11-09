@@ -16,6 +16,8 @@ window.
   via kotlinx.serialization.
 - **Native interop:** JNA for platform APIs; Rust `kbd-global` crate for Linux
   evdev global hotkeys.
+- **D-Bus:** `dbus-java` (core + native unixsocket transport) is used on KDE to
+  host the bridge KWin scripts report through.
 - **Testing:** Kotest + JUnit 4 (Compose UI tests via `createComposeRule`),
   plus real-desktop E2E tests under `src/e2e/kotlin`.
 
@@ -32,7 +34,7 @@ src/main/kotlin/com/adrinand/gokfre/
   core/comms/             # Unix-domain socket single-instance handshake.
   core/logging/           # AppLogging initialization.
 lib/gokfre-hotkey/        # Rust library for Linux evdev hotkeys.
-extensions/               # GNOME Shell extension + KDE KWin script.
+extensions/               # GNOME Shell extension.
 ```
 
 ## Build and test commands
@@ -77,14 +79,45 @@ This repo is configured for opencode:
 - Prefer immutable value objects for persistence; use `SnapshotStateList` only
   for Compose-bound mutable UI state.
 - Keep composables focused; extract reusable components to small files.
+- Keep comments minimal: short, and only for non-obvious *why* (compatibility
+  quirks, security, ordering). Do not narrate code. Extended design notes belong
+  in this file, not in code comments. Apply this to Kotlin, JS, and shell alike;
+  when you add or change a comment, move any long explanation here instead.
+
+## Wayland backends
+
+Both backends run outside the app, so `core/screen/` talks to them over the
+session bus. Design notes live here instead of in code comments.
+
+- **GNOME (`GnomeWindowManager`)** needs the `gokfre@adrinand` extension.
+  GNOME has no scripting D-Bus API: `org.gnome.Shell.Eval` returns
+  `(false, '')` for external callers unless `unsafe-mode` is enabled (a
+  deliberate security restriction), and `org.gnome.Shell.Introspect` is
+  read-only. The extension runs in-process and exposes
+  `org.gnome.Shell.Extensions.Gokfre`. GNOME disables extensions while the
+  screen is locked.
+- **KDE (`KdeWindowManager`)** needs nothing installed. KWin ships
+  `org.kde.KWin.Scripting`, so each operation loads a short script, runs it, and
+  unloads it. KWin scripts cannot own D-Bus names, so the app hosts
+  `org.kde.gokfre.Bridge` (`KdeBridge`) and scripts report results with
+  `callDBus` (`Report(token, json)`); `KdeScriptRunner` matches replies by token.
+  The script is `src/main/resources/kde/gokfre-kde.js`; `KdeScriptRenderer`
+  renders it per operation by substituting `__GOKFRE_*__` placeholders. Every
+  script gets a fresh JS context, so the file stays self-contained.
+- **KWin compatibility:** Plasma 5 exposes `activeClient`/`clientList`, Plasma 6
+  `activeWindow`/`windowList` (support both). Scripts live at `/<id>` on 5.27
+  and `/Scripting/Script<id>` on newer builds. `frameGeometry` is read-write;
+  `internalId` exists on 5.27+; maximize uses `setMaximize(bool, bool)`, and
+  `maximizeMode` is read-only (3 = full).
 
 ## Things that are easy to break
 
 - **OS window management:** Changes in `core/screen/` can break X11, Wayland,
   or macOS behavior. Always test on the target OS. E2E arrangement tests run
-  on X11 and on Wayland GNOME/KDE when the helper extension/script is enabled;
-  GNOME disables extensions while the screen is locked, which makes the
-  arrangement test fail with a clear message.
+  on X11 and on Wayland GNOME/KDE when the helper backend is enabled (GNOME
+  needs the extension installed; KDE uses KWin scripting and needs nothing
+  installed). GNOME disables extensions while the screen is locked, which makes
+  the arrangement test fail with a clear message.
 - **Global hotkeys:** Linux evdev needs `/dev/input/event*` and `/dev/uinput`
   access. The Rust native lib must be rebuilt after changes.
 - **Single-instance socket:** `AppSocketComms` uses a fixed Unix socket path

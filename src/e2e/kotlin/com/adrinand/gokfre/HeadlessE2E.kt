@@ -32,8 +32,8 @@ fun requireArrangementEnvironment() {
 
         sessionType == "wayland" && desktop.contains("kde") -> {
             check(awaitWaylandBackend { KdeWindowManager().isAvailable() }) {
-                "Wayland arrangement on KDE requires the gokfre.kwin script " +
-                    "to be installed, enabled, and active on D-Bus"
+                "Wayland arrangement on KDE requires KWin scripting " +
+                    "(org.kde.KWin.Scripting) to be reachable on the session bus"
             }
         }
 

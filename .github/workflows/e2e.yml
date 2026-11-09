@@ -47,11 +47,15 @@ jobs:
 
       - name: Run E2E tests
         run: ./gradlew e2e --no-daemon --stacktrace
-        env:
-          XDG_SESSION_TYPE: ${{ env.XDG_SESSION_TYPE }}
-          XDG_CURRENT_DESKTOP: ${{ env.XDG_CURRENT_DESKTOP }}
-          WAYLAND_DISPLAY: ${{ env.WAYLAND_DISPLAY }}
-          DISPLAY: ${{ env.DISPLAY }}
+
+      - name: Show E2E failures
+        if: failure()
+        run: |
+          for f in build/test-results/e2e/*.xml; do
+            [ -f "$f" ] || continue
+            echo "===== $f ====="
+            grep -oE '<testcase name="[^"]*"[^>]*>|<failure message="[^"]*"' "$f" || true
+          done
 
       - name: Upload E2E reports
         if: failure()

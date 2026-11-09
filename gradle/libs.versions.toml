@@ -10,6 +10,7 @@ jnativehook = "2.2.2"
 kotlinx-serialization = "1.7.3"
 slf4j = "2.0.7"
 systemtray = "4.4"
+dbusjava = "5.1.1"
 
 [libraries]
 kotest-runner-junit5 = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }
@@ -20,6 +21,8 @@ jnativehook = { group = "com.github.kwhat", name = "jnativehook", version.ref = 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
 dorkbox-systemtray = { group = "com.dorkbox", name = "SystemTray", version.ref = "systemtray" }
+dbus-java-core = { group = "com.github.hypfvieh", name = "dbus-java-core", version.ref = "dbusjava" }
+dbus-java-transport-native-unixsocket = { group = "com.github.hypfvieh", name = "dbus-java-transport-native-unixsocket", version.ref = "dbusjava" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
