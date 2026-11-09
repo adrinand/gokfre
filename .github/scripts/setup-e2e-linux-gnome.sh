@@ -17,7 +17,6 @@ sudo apt-get install -y \
     gnome-shell-extension-prefs \
     xwayland \
     xdotool \
-    libappindicator3-1 \
     libayatana-appindicator3-1 \
     at-spi2-core \
     sqlite3 \
