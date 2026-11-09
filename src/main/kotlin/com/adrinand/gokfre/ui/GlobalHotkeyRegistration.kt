@@ -29,19 +29,23 @@ fun globalHotkeyRegistration(
     settingsViewModel: SettingsViewModel,
     onPermissionMissing: () -> Unit,
     onToggle: () -> Unit,
+    globalHotkeyProvider: GlobalHotkeyProvider? = null,
+    toggleDispatcher: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
 ) {
     var hotkeyProvider by remember { mutableStateOf<GlobalHotkeyProvider?>(null) }
 
     LaunchedEffect(Unit) {
         var previousHotkey = settingsViewModel.toggleHotkey
         var registeredHotkey: Hotkey? = null
+        var providerCreated = false
         combine(
             snapshotFlow { settingsViewModel.toggleHotkey },
             snapshotFlow { settingsViewModel.isHotkeyCaptureActive },
         ) { hotkey, capturing -> hotkey to capturing }
             .collect { (newHotkey, capturing) ->
-                if (hotkeyProvider == null && !capturing) {
-                    hotkeyProvider = createGlobalHotkeyProvider(onPermissionMissing)
+                if (!providerCreated && hotkeyProvider == null && !capturing) {
+                    hotkeyProvider = globalHotkeyProvider ?: createGlobalHotkeyProvider(onPermissionMissing)
+                    providerCreated = true
                 }
                 val provider = hotkeyProvider
                 registeredHotkey?.let { hotkey -> provider?.unregister(hotkey) }
@@ -57,6 +61,7 @@ fun globalHotkeyRegistration(
                                 previousHotkey = previousHotkey,
                                 onToggle = onToggle,
                                 viewModel = settingsViewModel,
+                                toggleDispatcher = toggleDispatcher,
                             )
                         if (previousHotkey == newHotkey) {
                             registeredHotkey = newHotkey
@@ -80,9 +85,10 @@ private fun registerHotkeySafely(
     previousHotkey: Hotkey,
     onToggle: () -> Unit,
     viewModel: SettingsViewModel,
+    toggleDispatcher: (() -> Unit) -> Unit,
 ): Hotkey =
     try {
-        provider.register(hotkey) { SwingUtilities.invokeLater { onToggle() } }
+        provider.register(hotkey) { toggleDispatcher(onToggle) }
         viewModel.registrationError = null
         logger.info { "Registered hotkey: $hotkey" }
         hotkey
