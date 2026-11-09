@@ -103,7 +103,10 @@ session bus. Design notes live here instead of in code comments.
   `callDBus` (`Report(token, json)`); `KdeScriptRunner` matches replies by token.
   The script is `src/main/resources/kde/gokfre-kde.js`; `KdeScriptRenderer`
   renders it per operation by substituting `__GOKFRE_*__` placeholders. Every
-  script gets a fresh JS context, so the file stays self-contained.
+  script gets a fresh JS context, so the file stays self-contained. CI starts
+  KWin with `--virtual --xwayland` (virtual backend, QPainter compositing), so
+  no GPU or logind session is needed; XWayland only exposes `-displayfd`, so
+  CI finds its display by probing `:0`–`:9`.
 - **KWin compatibility:** Plasma 5 exposes `activeClient`/`clientList`, Plasma 6
   `activeWindow`/`windowList` (support both). Scripts live at `/<id>` on 5.27
   and `/Scripting/Script<id>` on newer builds. `frameGeometry` is read-write;

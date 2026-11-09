@@ -10,8 +10,8 @@ export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update
 
 # Core desktop stack. kwin-wayland is the KDE compositor; plasma-workspace
-# provides KWin script helpers and schemas; xwayland lets X11 clients run;
-# x11-utils provides xdpyinfo for display discovery.
+# provides its runtime helpers; xwayland lets X11 clients run; x11-utils
+# provides xdpyinfo for display discovery.
 sudo apt-get install -y \
     dbus-x11 \
     kwin-wayland \
@@ -37,11 +37,13 @@ export DBUS_SESSION_BUS_ADDRESS
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=KDE
 
-# Start KWin as a nested Wayland compositor with XWayland. Detach it so it
-# survives the end of this workflow step (GitHub Actions reaps orphaned
-# processes). The scripting engine is part of KWin, which gokfre drives over
-# org.kde.KWin.Scripting.
-RUNNER_TRACKING_ID="" setsid kwin_wayland --xwayland \
+# Start KWin with the virtual backend so it needs no GPU or logind session.
+# QPainter compositing avoids requiring OpenGL on the headless runner. Detach
+# it so it survives the end of this workflow step (GitHub Actions reaps
+# orphaned processes). The scripting engine is part of KWin, which gokfre
+# drives over org.kde.KWin.Scripting.
+RUNNER_TRACKING_ID="" KWIN_COMPOSE=Q setsid kwin_wayland \
+    --virtual --xwayland --width 1920 --height 1080 \
     > /tmp/kwin.log 2>&1 < /dev/null &
 KWIN_PID=$!
 
@@ -68,60 +70,70 @@ fi
 
 echo "KWin running on Wayland socket $WAYLAND_SOCK (PID $KWIN_PID)"
 
-# Find the XWayland server the compositor started. Parse its command line to
-# learn the display number and the Xauthority file it was started with: the
-# compositor starts XWayland with an auth cookie, so clients outside the
-# session need XAUTHORITY to connect.
-discover_xwayland() {
-    local pid args display auth
-    for pid in $(pgrep -x Xwayland || true); do
+# KWin starts Xwayland rootless with "-displayfd" and no explicit ":N", so the
+# display number must be discovered by probing. It only passes "-auth" when
+# launched with --xwayland-xauthority; honour it if present.
+wait_for_xwayland() {
+    for _ in $(seq 1 60); do
+        if pgrep -x Xwayland >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+
+xwayland_auth_file() {
+    local pid args
+    for pid in $(pgrep -x Xwayland 2>/dev/null || true); do
         args="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
-        display="$(printf '%s' "$args" | grep -oE ' :[0-9]+' | head -n1 | tr -d ' ')"
-        auth="$(printf '%s' "$args" | grep -oE '\-auth [^ ]+' | head -n1 | cut -d' ' -f2)"
-        if [ -n "$display" ]; then
-            printf '%s\n%s\n' "$display" "$auth"
+        printf '%s' "$args" | grep -oE '\-auth [^ ]+' | head -n1 | cut -d' ' -f2 || true
+        return 0
+    done
+    return 0
+}
+
+find_x11_display() {
+    local n
+    for n in $(seq 0 9); do
+        if [ -S "/tmp/.X11-unix/X$n" ] && xdpyinfo -display ":$n" >/dev/null 2>&1; then
+            echo ":$n"
             return 0
         fi
     done
     return 1
 }
 
-XINFO=""
-for _ in $(seq 1 60); do
-    if XINFO="$(discover_xwayland)"; then
-        break
-    fi
-    sleep 0.5
-done
-
-DISPLAY_NUM=""
-XAUTHORITY_PATH=""
-if [ -n "$XINFO" ]; then
-    DISPLAY_NUM="$(printf '%s\n' "$XINFO" | sed -n '1p')"
-    XAUTHORITY_PATH="$(printf '%s\n' "$XINFO" | sed -n '2p')"
-fi
-
-# Fallback: probe displays; useful if the XWayland command line is unreadable.
-if [ -z "$DISPLAY_NUM" ]; then
-    for n in $(seq 0 9); do
-        if [ -S "/tmp/.X11-unix/X$n" ] && xdpyinfo -display ":$n" >/dev/null 2>&1; then
-            DISPLAY_NUM=":$n"
-            break
-        fi
-    done
-fi
-
-if [ -z "$DISPLAY_NUM" ]; then
-    echo "ERROR: XWayland display not found"
+if ! wait_for_xwayland; then
+    echo "ERROR: Xwayland did not start"
     cat /tmp/kwin.log || true
     kill "$KWIN_PID" 2>/dev/null || true
     exit 1
 fi
 
-export DISPLAY="$DISPLAY_NUM"
+XAUTHORITY_PATH="$(xwayland_auth_file || true)"
 if [ -n "$XAUTHORITY_PATH" ]; then
     export XAUTHORITY="$XAUTHORITY_PATH"
 fi
+
+DISPLAY_NUM=""
+for _ in $(seq 1 60); do
+    if DISPLAY_NUM="$(find_x11_display)"; then
+        break
+    fi
+    sleep 0.5
+done
+
+if [ -z "$DISPLAY_NUM" ]; then
+    echo "ERROR: XWayland display not found"
+    cat /tmp/kwin.log || true
+    ls -la /tmp/.X11-unix || true
+    pgrep -a Xwayland || true
+    kill "$KWIN_PID" 2>/dev/null || true
+    exit 1
+fi
+
+export DISPLAY="$DISPLAY_NUM"
 
 if ! xdpyinfo >/dev/null 2>&1; then
     echo "ERROR: xdpyinfo failed for DISPLAY=$DISPLAY (XAUTHORITY=${XAUTHORITY:-})"
