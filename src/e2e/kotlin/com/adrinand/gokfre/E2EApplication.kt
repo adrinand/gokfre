@@ -62,7 +62,6 @@ class E2EAppHandle(
  * exercise actual OS window-management behavior.
  */
 object E2EApplication {
-
     fun launch(
         settingsPath: Path =
             createTempDirectory("gokfre-e2e-settings")
