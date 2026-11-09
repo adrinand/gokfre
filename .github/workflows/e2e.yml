@@ -34,7 +34,7 @@ jobs:
 
       - name: Set up Rust (Linux)
         if: runner.os == 'Linux'
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Gradle
         uses: gradle/actions/setup-gradle@v3
