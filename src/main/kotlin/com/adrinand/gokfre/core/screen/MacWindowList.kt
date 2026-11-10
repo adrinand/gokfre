@@ -35,7 +35,7 @@ internal interface CoreGraphicsServices : Library {
  * itself. Used when the system-wide accessibility element cannot report the
  * focused application.
  */
-internal fun frontmostWindowPid(selfPid: Long = ProcessHandle.current().pid()): Long? =
+internal fun frontmostWindowOwnerPid(selfPid: Long = ProcessHandle.current().pid()): Long? =
     runCatching {
         val windows =
             CoreGraphicsServices.INSTANCE.CGWindowListCopyWindowInfo(
@@ -56,37 +56,6 @@ internal fun frontmostWindowPid(selfPid: Long = ProcessHandle.current().pid()): 
             windows.release()
         }
     }.onFailure { logger.warning { "Failed to read the frontmost window list: ${it.message}" } }.getOrNull()
-
-internal fun focusedElementPid(
-    systemWide: AXUIElementRef,
-    selfPid: Long,
-): Long? {
-    val elementPointer =
-        copyAttribute(
-            ApplicationServices.INSTANCE,
-            systemWide,
-            kAXFocusedUIElementAttribute,
-        ) ?: return null
-    val element = AXUIElementRef(elementPointer.pointer)
-    return try {
-        readPid(ApplicationServices.INSTANCE, element)?.takeIf { it != selfPid && hasFocusedWindow(it) }
-    } finally {
-        release(element)
-    }
-}
-
-private fun hasFocusedWindow(pid: Long): Boolean {
-    val app = ApplicationServices.INSTANCE
-    val appElement = app.AXUIElementCreateApplication(pid.toInt())
-    if (appElement.pointer == null) return false
-    return try {
-        val window = focusedWindow(app, appElement) ?: return false
-        release(window)
-        true
-    } finally {
-        release(appElement)
-    }
-}
 
 private fun normalWindowOwnerPid(
     windows: CFArrayRef,
