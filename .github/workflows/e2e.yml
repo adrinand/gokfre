@@ -17,7 +17,6 @@ permissions:
 jobs:
   e2e:
     name: E2E (${{ matrix.environment }})
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     strategy:
