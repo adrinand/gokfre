@@ -1,6 +1,7 @@
 package com.adrinand.gokfre
 
 import java.awt.Rectangle
+import java.awt.Toolkit
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
@@ -40,6 +41,25 @@ class TestTargetWindow(
             val holder = AtomicReference<Rectangle>()
             SwingUtilities.invokeAndWait { holder.set(frame.bounds) }
             return holder.get() ?: error("Failed to read target window bounds")
+        }
+
+    val workArea: Rectangle
+        get() {
+            val holder = AtomicReference<Rectangle>()
+            SwingUtilities.invokeAndWait {
+                val config = frame.graphicsConfiguration
+                val insets = Toolkit.getDefaultToolkit().getScreenInsets(config)
+                val screen = config.bounds
+                holder.set(
+                    Rectangle(
+                        screen.x + insets.left,
+                        screen.y + insets.top,
+                        screen.width - insets.left - insets.right,
+                        screen.height - insets.top - insets.bottom,
+                    ),
+                )
+            }
+            return holder.get() ?: error("Failed to read target work area")
         }
 
     fun focus(settleMs: Long = 300L) {

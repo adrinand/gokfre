@@ -64,10 +64,34 @@ cd lib/gokfre-hotkey && cargo test
 This repo is configured for opencode:
 
 - `AGENTS.md` and `REVIEW.md` are loaded as instructions.
-- `/pre-pr` runs verification (`./gradlew check`, `cargo test`, `./gradlew e2e`)
-  and then code + security review.
+- `/pre-pr` runs verification (`./gradlew check`, `cargo test`, `./gradlew e2e`),
+  invokes the code and security reviewers, then commits, pushes, and ensures a
+  draft PR exists.
 - `/review` re-runs code and security review only.
 - Review agents are read-only (`edit: deny`); the parent agent decides what to fix.
+
+### Definition of done (mandatory)
+
+An implementation task is not finished until the work is reviewed, committed,
+pushed, and has a PR. Before reporting completion, the parent agent must:
+
+1. Run `./gradlew check` (plus `cargo test` / `./gradlew e2e` when the change
+   touches those areas).
+2. Invoke both review subagents (`reviewer` and `security-reviewer`) with the
+   Task tool on the current diff. Address `Important` findings, or report
+   explicitly why they are out of scope.
+3. Stage only the intended files and commit with a message matching the repo
+   style.
+4. Push the current branch (`git push -u origin HEAD`). Never finish with
+   unpushed commits.
+5. Ensure a PR exists. Always create it as a draft (`gh pr create --draft ...`);
+   if a PR already exists, update it instead of opening a new one. Never mark a
+   PR ready for review unless the user explicitly asks.
+6. Report the PR URL, or the exact blocker that prevented pushing or opening it.
+
+Review subagents are read-only, so the parent agent performs the commit, push,
+and PR steps. If pushing or PR creation is impossible (no remote, missing auth),
+say so explicitly instead of silently finishing.
 
 ## Conventions
 
