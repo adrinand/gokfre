@@ -114,9 +114,9 @@ class LinuxTrayManager(private val controller: TrayController) {
         }
 
         val desktop = System.getenv("XDG_CURRENT_DESKTOP")?.lowercase() ?: ""
-        if (desktop.contains("gnome")) {
+        if (desktop.contains("gnome") || desktop.contains("kde")) {
             SystemTray.FORCE_TRAY_TYPE = SystemTray.TrayType.AppIndicator
-            logger.info { "Forcing AppIndicator tray on GNOME" }
+            logger.info { "Forcing AppIndicator tray on $desktop" }
         }
     }
 
