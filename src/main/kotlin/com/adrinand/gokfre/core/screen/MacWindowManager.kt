@@ -77,14 +77,26 @@ class MacWindowManager : SingleBackendWindowManager<WindowHandle.Mac>() {
     ): Boolean = true
 
     private fun buildMacHandle(systemWide: AXUIElementRef): WindowHandle.Mac? {
-        val focusedAppPointer = copyAttribute(app, systemWide, kAXFocusedApplicationAttribute) ?: return null
-        val focusedApp = AXUIElementRef(focusedAppPointer.pointer)
+        val focusedAppPointer = copyAttribute(app, systemWide, kAXFocusedApplicationAttribute)
+        val focusedApp = focusedAppPointer?.let { AXUIElementRef(it.pointer) }
         try {
-            val pid = readPid(app, focusedApp) ?: return null
-            val title = readWindowTitle(app, focusedApp)
-            return WindowHandle.Mac(pid = pid, title = title ?: "")
+            val selfPid = ProcessHandle.current().pid()
+            val focusedAppPid = focusedApp?.let { readPid(app, it) }
+            val pid =
+                focusedAppPid?.takeIf { it != selfPid }
+                    ?: focusedElementPid(systemWide, selfPid)
+                    ?: frontmostWindowPid(selfPid)
+            if (pid == null) {
+                logger.warning { "Could not determine the frontmost application or window" }
+                return null
+            }
+            if (focusedAppPid != pid) {
+                logger.info { "Using fallback window pid=$pid (focused app pid=$focusedAppPid)" }
+            }
+            val title = if (focusedAppPid == pid) focusedApp?.let { readWindowTitle(app, it) } ?: "" else ""
+            return WindowHandle.Mac(pid = pid, title = title)
         } finally {
-            release(focusedApp)
+            focusedApp?.let { release(it) }
         }
     }
 }
