@@ -1,6 +1,8 @@
 package com.adrinand.gokfre
 
 import com.adrinand.gokfre.ui.PREVIEW_WINDOW_TITLE
+import java.awt.Component
+import java.awt.Container
 import java.awt.Frame
 import java.awt.Window
 import java.awt.event.KeyEvent
@@ -40,17 +42,29 @@ fun sendKeyToWindow(
     window: Window,
     keyCode: Int,
 ) {
-    val focusOwner = window.mostRecentFocusOwner ?: window
     SwingUtilities.invokeAndWait {
+        val target = findKeyEventComponent(window) ?: window.mostRecentFocusOwner ?: window
         val timestamp = System.currentTimeMillis()
         val keyChar = keyCharFor(keyCode)
-        focusOwner.dispatchEvent(
-            KeyEvent(focusOwner, KeyEvent.KEY_PRESSED, timestamp, 0, keyCode, keyChar, KeyEvent.KEY_LOCATION_STANDARD),
+        target.dispatchEvent(
+            KeyEvent(target, KeyEvent.KEY_PRESSED, timestamp, 0, keyCode, keyChar, KeyEvent.KEY_LOCATION_STANDARD),
         )
-        focusOwner.dispatchEvent(
-            KeyEvent(focusOwner, KeyEvent.KEY_RELEASED, timestamp, 0, keyCode, keyChar, KeyEvent.KEY_LOCATION_STANDARD),
+        target.dispatchEvent(
+            KeyEvent(target, KeyEvent.KEY_RELEASED, timestamp, 0, keyCode, keyChar, KeyEvent.KEY_LOCATION_STANDARD),
         )
     }
+}
+
+private fun findKeyEventComponent(component: Component): Component? {
+    if (component.keyListeners.isNotEmpty()) {
+        return component
+    }
+    if (component is Container) {
+        for (child in component.components) {
+            findKeyEventComponent(child)?.let { return it }
+        }
+    }
+    return null
 }
 
 fun activateWindowByTitle(title: String): Boolean {

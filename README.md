@@ -69,7 +69,7 @@ X11 provides a universal window-management API, but Wayland intentionally does n
 |---|---|---|
 | X11 | X11 | Works out of the box. |
 | Wayland + GNOME | GNOME Shell extension | Install `gokfre@adrinand` (see below). |
-| Wayland + KDE Plasma | KWin script | Install `gokfre.kwin` (see below). |
+| Wayland + KDE Plasma | KWin scripting | Works out of the box; nothing to install. |
 | Wayland + other | X11 fallback | Only XWayland windows can be tiled. |
 | macOS | Accessibility API | Grants Accessibility permission when prompted. |
 
@@ -86,22 +86,6 @@ Then enable it and restart GNOME Shell (on Wayland this usually requires logging
 ```bash
 gnome-extensions enable gokfre@adrinand
 ```
-
-#### Installing the KDE KWin script
-
-For local development:
-
-```bash
-./gradlew installKdeScript
-```
-
-Then enable it in KWin's script settings or with:
-
-```bash
-kwriteconfig6 --file kwinrc --group Plugins --key gokfreEnabled true
-```
-
-Restart KWin afterward.
 
 ## Tests
 

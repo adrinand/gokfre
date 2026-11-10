@@ -1,8 +1,15 @@
 name: E2E Tests
 
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_call:
   workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -10,7 +17,9 @@ permissions:
 jobs:
   e2e:
     name: E2E (${{ matrix.environment }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -37,21 +46,27 @@ jobs:
 
       - name: Set up Rust (Linux)
         if: runner.os == 'Linux'
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Set up desktop environment
+        timeout-minutes: 15
         run: bash .github/scripts/${{ matrix.setup-script }}
 
       - name: Run E2E tests
+        timeout-minutes: 20
         run: ./gradlew e2e --no-daemon --stacktrace
-        env:
-          XDG_SESSION_TYPE: ${{ env.XDG_SESSION_TYPE }}
-          XDG_CURRENT_DESKTOP: ${{ env.XDG_CURRENT_DESKTOP }}
-          WAYLAND_DISPLAY: ${{ env.WAYLAND_DISPLAY }}
-          DISPLAY: ${{ env.DISPLAY }}
+
+      - name: Show E2E failures
+        if: failure()
+        run: |
+          for f in build/test-results/e2e/*.xml; do
+            [ -f "$f" ] || continue
+            echo "===== $f ====="
+            grep -oE '<testcase name="[^"]*"[^>]*>|<failure message="[^"]*"' "$f" || true
+          done
 
       - name: Upload E2E reports
         if: failure()
@@ -62,4 +77,7 @@ jobs:
             build/reports/tests/e2e/
             build/test-results/e2e/
             lib/gokfre-hotkey/target/
+            hs_err_pid*.log
+            /tmp/kwin.log
+            /tmp/gnome-shell.log
           if-no-files-found: ignore

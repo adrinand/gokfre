@@ -21,7 +21,7 @@ Focus areas:
    path traversal, race conditions, symlink attacks, atomic writes.
 4. **Serialization** (`PersistedSettings`, JSON decoding): deserialization
    attacks, unknown key handling, version migration issues.
-5. **Command execution and shell** (`installGnomeExtension`, `installKdeScript`):
+5. **Command execution and shell** (`installGnomeExtension`, KWin scripting):
    injection, unsafe argument passing.
 
 Provide findings with file path, line number, severity (`Important`, `Nit`, or
