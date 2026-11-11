@@ -2,6 +2,7 @@ package com.adrinand.gokfre
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,11 +29,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
+import java.awt.Rectangle
 import java.util.logging.Level
 import java.util.logging.Logger
 import javax.swing.SwingUtilities
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.Main")
+
+private fun isOnDifferentMonitor(
+    a: Rectangle,
+    b: Rectangle,
+): Boolean = !a.intersects(b)
 
 fun main() {
     AppLogging.initialize()
@@ -78,6 +85,8 @@ fun runGokfreApplication(
         var windowManager by remember { mutableStateOf<WindowManager?>(null) }
         var arrangementController by remember { mutableStateOf<ArrangementController?>(null) }
         var isWindowVisible by remember { mutableStateOf(false) }
+        var previewWindowKey by remember { mutableStateOf(0) }
+        var lastPreviewWorkArea by remember { mutableStateOf<Rectangle?>(null) }
         var showSettings by remember { mutableStateOf(false) }
         var showPermissionWarning by remember { mutableStateOf(false) }
         val trayIcon = remember { createTrayIcon() }
@@ -105,6 +114,15 @@ fun runGokfreApplication(
             if (controller != null) {
                 if (!isWindowVisible) {
                     controller.captureTargetWindow()
+                    val targetWorkArea = controller.targetWorkArea
+                    val previousWorkArea = lastPreviewWorkArea
+                    val monitorChanged =
+                        targetWorkArea != null && previousWorkArea != null &&
+                            isOnDifferentMonitor(previousWorkArea, targetWorkArea)
+                    if (monitorChanged) {
+                        previewWindowKey++
+                    }
+                    lastPreviewWorkArea = targetWorkArea
                 }
                 isWindowVisible = !isWindowVisible
                 logger.info("Preview window visible=$isWindowVisible")
@@ -121,13 +139,15 @@ fun runGokfreApplication(
             toggleDispatcher = toggleDispatcher,
         )
 
-        arrangementController?.let { controller ->
-            GokfreWindow(
-                visible = isWindowVisible,
-                onClose = { isWindowVisible = false },
-                viewModel = settingsViewModel,
-                arrangementController = controller,
-            )
+        key(previewWindowKey) {
+            arrangementController?.let { controller ->
+                GokfreWindow(
+                    visible = isWindowVisible,
+                    onClose = { isWindowVisible = false },
+                    viewModel = settingsViewModel,
+                    arrangementController = controller,
+                )
+            }
         }
 
         GokfreTray(
