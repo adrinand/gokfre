@@ -19,7 +19,18 @@ private const val INTERFACE_NAME = "org.gnome.Shell.Extensions.Gokfre"
 private const val POLL_INTERVAL_MS = 50L
 private const val MAXIMIZE_SETTLE_MS = 50L
 private const val CALL_TIMEOUT_MS = 300L
+private const val BOUNDS_VALUE_COUNT = 4
+private const val X_INDEX = 0
+private const val Y_INDEX = 1
+private const val WIDTH_INDEX = 2
+private const val HEIGHT_INDEX = 3
 private val LEADING_BOOLEAN_REGEX = Regex("""\(\s*(true|false)""")
+private val CAPTURED_BOUNDS_REGEX =
+    Regex(
+        """\(\s*true\s*,.*?,\s*(-?\d+)\s*,\s*(-?\d+)\s*,""" +
+            """\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*$""",
+        RegexOption.DOT_MATCHES_ALL,
+    )
 
 /**
  * [WindowManager] implementation for native Wayland windows on GNOME.
@@ -28,6 +39,7 @@ private val LEADING_BOOLEAN_REGEX = Regex("""\(\s*(true|false)""")
  * (`gokfre@adrinand`) to be installed and enabled. The extension stores a
  * reference to the captured active window and can move/resize it on demand.
  */
+@Suppress("TooManyFunctions")
 class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.GnomeWindowManager")
 
@@ -52,6 +64,17 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         val output = callMethod("CaptureActiveWindow") ?: return null
         val success = parseLeadingBoolean(output.trim()) ?: return null
         return if (success) WindowHandle.Wayland(BACKEND_NAME, WAYLAND_TOKEN) else null
+    }
+
+    @Suppress("ReturnCount")
+    override fun retrieveBounds(handle: WindowHandle.Wayland): Rectangle? {
+        val output = callMethod("GetCapturedWindow") ?: return null
+        val match = CAPTURED_BOUNDS_REGEX.find(output.trim()) ?: return null
+        val values = match.groupValues.drop(1).mapNotNull { it.toIntOrNull() }
+        if (values.size != BOUNDS_VALUE_COUNT) {
+            return null
+        }
+        return Rectangle(values[X_INDEX], values[Y_INDEX], values[WIDTH_INDEX], values[HEIGHT_INDEX])
     }
 
     override fun applyBounds(
@@ -83,15 +106,77 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 logger.warning { "GNOME extension did not maximize the preview" }
                 return@withContext false
             }
-            waitForMaximized(timeoutMs)
+            waitForMaximized(timeoutMs, expected = true)
         }
 
-    private suspend fun waitForMaximized(timeoutMs: Long): Boolean {
+    override suspend fun exitFullscreen(
+        window: Window,
+        timeoutMs: Long,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            val output = callMethod("RestorePreview", timeoutMs = CALL_TIMEOUT_MS)
+            val restoredByExtension =
+                output != null &&
+                    parseLeadingBoolean(output.trim()) == true &&
+                    waitForMaximized(timeoutMs, expected = false)
+            if (restoredByExtension) {
+                true
+            } else {
+                // Older extensions lack RestorePreview; the preview is an
+                // XWayland window, so EWMH still works as a fallback.
+                X11Fullscreen.unsetFullscreen(window, timeoutMs)
+            }
+        }
+
+    override suspend fun placePreview(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ) {
+        val placed =
+            withContext(Dispatchers.IO) {
+                val output =
+                    callMethod(
+                        "PlacePreview",
+                        listOf(
+                            bounds.x.toString(),
+                            bounds.y.toString(),
+                            bounds.width.toString(),
+                            bounds.height.toString(),
+                        ),
+                        timeoutMs = CALL_TIMEOUT_MS,
+                    )
+                output != null &&
+                    parseLeadingBoolean(output.trim()) == true &&
+                    waitForMaximized(timeoutMs, expected = true)
+            }
+        if (placed) {
+            window.bounds = bounds
+        } else {
+            super.placePreview(window, bounds, timeoutMs)
+        }
+    }
+
+    override suspend fun focusPreview(window: Window) {
+        val activated =
+            withContext(Dispatchers.IO) {
+                val output = callMethod("FocusPreview", timeoutMs = CALL_TIMEOUT_MS)
+                output != null && parseLeadingBoolean(output.trim()) == true
+            }
+        if (!activated) {
+            super.focusPreview(window)
+        }
+    }
+
+    private suspend fun waitForMaximized(
+        timeoutMs: Long,
+        expected: Boolean,
+    ): Boolean {
         delay(MAXIMIZE_SETTLE_MS.milliseconds)
         val deadline = TimeSource.Monotonic.markNow() + timeoutMs.milliseconds
         while (deadline.hasNotPassedNow()) {
             val output = callMethod("IsPreviewMaximized", timeoutMs = CALL_TIMEOUT_MS) ?: return false
-            if (parseLeadingBoolean(output.trim()) == true) {
+            if (parseLeadingBoolean(output.trim()) == expected) {
                 return true
             }
             delay(POLL_INTERVAL_MS.milliseconds)

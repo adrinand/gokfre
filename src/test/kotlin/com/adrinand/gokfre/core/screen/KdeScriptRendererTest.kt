@@ -57,9 +57,21 @@ class KdeScriptRendererTest {
     @Test
     fun `preview scripts target the gokfre preview window`() {
         val maximize = KdeScriptRenderer.maximizePreview()
+        val restore = KdeScriptRenderer.restorePreview()
 
         maximize shouldContain "Gokfre Preview"
         maximize shouldContain "previewWindow()"
+        restore shouldContain "Gokfre Preview"
+        restore shouldContain "unmaximize"
+    }
+
+    @Test
+    fun `bounds script queries the captured window geometry`() {
+        val script = KdeScriptRenderer.bounds(windowId)
+
+        script shouldContain "\"bounds\""
+        script shouldContain "\"$windowId\""
+        script shouldContain "frameGeometry"
     }
 
     @Test
@@ -68,8 +80,10 @@ class KdeScriptRendererTest {
             listOf(
                 KdeScriptRenderer.capture(),
                 KdeScriptRenderer.focus(windowId),
+                KdeScriptRenderer.bounds(windowId),
                 KdeScriptRenderer.moveResize(windowId, Rectangle(1, 2, 3, 4)),
                 KdeScriptRenderer.maximizePreview(),
+                KdeScriptRenderer.restorePreview(),
                 KdeScriptRenderer.isPreviewMaximized(),
                 KdeScriptRenderer.probe(),
             )

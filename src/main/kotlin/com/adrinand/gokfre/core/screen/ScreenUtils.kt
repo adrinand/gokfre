@@ -4,6 +4,9 @@ package com.adrinand.gokfre.core.screen
 
 import com.sun.jna.NativeLong
 import com.sun.jna.platform.unix.X11
+import java.awt.GraphicsConfiguration
+import java.awt.GraphicsEnvironment
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.Toolkit
 import java.awt.Window
@@ -12,9 +15,9 @@ fun isLinux(): Boolean = System.getProperty("os.name").lowercase().contains("lin
 
 fun isX11Session(): Boolean = System.getenv("XDG_SESSION_TYPE")?.lowercase() == "x11"
 
-fun Window.workAreaBounds(): Rectangle {
-    val screenBounds = graphicsConfiguration.bounds
-    val insets = Toolkit.getDefaultToolkit().getScreenInsets(graphicsConfiguration)
+fun GraphicsConfiguration.workAreaBounds(): Rectangle {
+    val screenBounds = bounds
+    val insets = Toolkit.getDefaultToolkit().getScreenInsets(this)
     return Rectangle(
         screenBounds.x + insets.left,
         screenBounds.y + insets.top,
@@ -22,6 +25,46 @@ fun Window.workAreaBounds(): Rectangle {
         screenBounds.height - insets.top - insets.bottom,
     )
 }
+
+/**
+ * Returns the work area of the monitor that hosts [windowBounds].
+ *
+ * The monitor containing the centre of the window wins; windows that span
+ * monitors fall back to the monitor with the largest overlap. Returns `null`
+ * when no screen device is available.
+ */
+fun monitorWorkAreaForWindowBounds(windowBounds: Rectangle): Rectangle? {
+    if (GraphicsEnvironment.isHeadless()) {
+        return null
+    }
+    val configurations =
+        GraphicsEnvironment
+            .getLocalGraphicsEnvironment()
+            .screenDevices
+            .map { it.defaultConfiguration }
+    val center = Point(windowBounds.x + windowBounds.width / 2, windowBounds.y + windowBounds.height / 2)
+    val target =
+        configurations.firstOrNull { it.bounds.contains(center) }
+            ?: configurations
+                .map { it to overlapArea(it.bounds, windowBounds) }
+                .filter { it.second > 0 }
+                .maxByOrNull { it.second }
+                ?.first
+    return target?.workAreaBounds()
+}
+
+private fun overlapArea(
+    first: Rectangle,
+    second: Rectangle,
+): Long {
+    val intersection = first.intersection(second)
+    if (intersection.width <= 0 || intersection.height <= 0) {
+        return 0
+    }
+    return intersection.width.toLong() * intersection.height.toLong()
+}
+
+fun Window.workAreaBounds(): Rectangle = graphicsConfiguration.workAreaBounds()
 
 fun x11WindowId(window: Window): Long? {
     return try {

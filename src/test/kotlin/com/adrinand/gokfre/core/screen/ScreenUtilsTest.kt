@@ -5,6 +5,7 @@ import org.junit.Assume.assumeFalse
 import org.junit.Test
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
+import java.awt.Rectangle
 import java.awt.Toolkit
 
 class ScreenUtilsTest {
@@ -33,5 +34,28 @@ class ScreenUtilsTest {
         } finally {
             frame.dispose()
         }
+    }
+
+    @Test
+    fun `monitor work area uses the screen that hosts the window`() {
+        assumeFalse("Skipping: headless environment", GraphicsEnvironment.isHeadless())
+        val frame = Frame()
+        frame.addNotify()
+        try {
+            val config = frame.graphicsConfiguration
+            val screen = config.bounds
+            val windowBounds = Rectangle(screen.x + screen.width / 4, screen.y + screen.height / 4, 100, 100)
+
+            monitorWorkAreaForWindowBounds(windowBounds) shouldBe config.workAreaBounds()
+        } finally {
+            frame.dispose()
+        }
+    }
+
+    @Test
+    fun `monitor work area is null when the window is outside every screen`() {
+        val farAway = Rectangle(-1_000_000, -1_000_000, 100, 100)
+
+        monitorWorkAreaForWindowBounds(farAway) shouldBe null
     }
 }

@@ -16,11 +16,15 @@ class HeadlessWindowManager : WindowManager {
     var lastBounds: Rectangle? = null
         private set
 
+    var activeWindowBounds: Rectangle? = null
+
     override fun getActiveWindowId(): WindowHandle {
         val handle = WindowHandle.X11(DEFAULT_HEADLESS_WINDOW_ID)
         lastActiveWindowHandle = handle
         return handle
     }
+
+    override fun getWindowBounds(window: WindowHandle): Rectangle? = activeWindowBounds
 
     override fun setWindowBounds(
         window: WindowHandle,
@@ -35,6 +39,11 @@ class HeadlessWindowManager : WindowManager {
     }
 
     override suspend fun enterFullscreen(
+        window: Window,
+        timeoutMs: Long,
+    ): Boolean = true
+
+    override suspend fun exitFullscreen(
         window: Window,
         timeoutMs: Long,
     ): Boolean = true

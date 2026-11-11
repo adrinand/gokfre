@@ -105,6 +105,15 @@ class MacWindowManagerTest {
 
         source.raisedPid shouldBe arrangePid
     }
+
+    @Test
+    fun `reads bounds from the captured pid`() {
+        val expected = Rectangle(100, 200, 800, 600)
+        val source = FakeMacWindowSource(currentWindowBounds = expected)
+        val manager = MacWindowManager(source)
+
+        manager.getWindowBounds(WindowHandle.Mac(pid = arrangePid)) shouldBe expected
+    }
 }
 
 private class FakeMacWindowSource(
@@ -113,6 +122,7 @@ private class FakeMacWindowSource(
     var frontmostPid: Long? = null,
     var focusedWindowPids: MutableSet<Long> = mutableSetOf(),
     var titles: MutableMap<Long, String> = mutableMapOf(),
+    var currentWindowBounds: Rectangle? = null,
 ) : MacWindowSource {
     var bounds: Pair<Long, Rectangle>? = null
     var raisedPid: Long? = null
@@ -126,6 +136,8 @@ private class FakeMacWindowSource(
     override fun frontmostWindowPid(selfPid: Long): Long? = frontmostPid?.takeIf { it != selfPid }
 
     override fun windowTitle(pid: Long): String? = titles[pid]
+
+    override fun windowBounds(pid: Long): Rectangle? = currentWindowBounds
 
     override fun setBounds(
         pid: Long,

@@ -33,6 +33,7 @@ import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.awt.Rectangle
 import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
@@ -60,6 +61,7 @@ fun GokfreWindow(
     var composeWindow by remember { mutableStateOf<ComposeWindow?>(null) }
     var previewReady by remember { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf<List<String>>(emptyList()) }
+    var lastWorkArea by remember { mutableStateOf<Rectangle?>(null) }
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -92,7 +94,7 @@ fun GokfreWindow(
         logger.info { "onKeyPressed: selectedKeys=$selectedKeys" }
         if (selectedKeys.size == MAX_SELECTED_KEYS) {
             val win = composeWindow ?: return
-            val workArea = win.workAreaBounds()
+            val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
             val keysToArrange = selectedKeys
             logger.info { "onKeyPressed: arranging then closing preview" }
             coroutineScope.launch {
@@ -138,8 +140,8 @@ fun GokfreWindow(
             }
 
             window.setOpacitySafely(0f)
-            window.bounds = window.workAreaBounds()
-            window.focusableWindowState = false
+            window.bounds = arrangementController.targetWorkArea ?: window.workAreaBounds()
+            window.focusableWindowState = visible
         }
 
         Box(
@@ -191,7 +193,6 @@ fun GokfreWindow(
         logger.info {
             "LaunchedEffect: showing preview, isVisible=${win.isVisible}, isShowing=${win.isShowing}"
         }
-        win.bounds = win.workAreaBounds()
         win.setOpacitySafely(0f)
         win.isAlwaysOnTop = true
         var waitedMs = 0L
@@ -202,19 +203,31 @@ fun GokfreWindow(
         if (!win.isShowing) {
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
+        val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
+        val sameMonitor = lastWorkArea?.intersects(workArea) ?: false
+        lastWorkArea = workArea
         win.focusableWindowState = true
+        win.isResizable = true
+        if (sameMonitor) {
+            arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+        } else {
+            // Atomic unmaximize + move + maximize, shell-side on GNOME. Moving
+            // a maximized window with client-side bounds races the WM and can
+            // leave the preview maximized on the previous monitor.
+            arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+        }
+        win.isResizable = false
         if (!isLinux()) {
             focusAppWindow()
         }
+        // Shell-side activation bypasses Mutter focus-stealing prevention after
+        // arrange() has just activated the target app; AWT calls as fallback.
+        arrangementController.windowManager.focusPreview(win)
         win.toFront()
         win.requestFocus()
         focusRequester.requestFocus()
         win.setOpacitySafely(1f)
         previewReady = true
-
-        win.isResizable = true
-        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-        win.isResizable = false
     }
 }
 

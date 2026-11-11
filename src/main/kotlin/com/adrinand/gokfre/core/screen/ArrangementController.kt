@@ -21,6 +21,9 @@ private const val HEX_RADIX = 16
 
 /**
  * Orchestrates capturing the target window and applying a tiled bounds to it.
+ *
+ * The monitor that hosts the captured window is recorded so the preview and the
+ * arrangement use that monitor's work area.
  */
 class ArrangementController(
     val windowManager: WindowManager,
@@ -28,12 +31,21 @@ class ArrangementController(
     private var targetWindow: WindowHandle? = null
 
     /**
+     * Work area of the monitor that hosted the captured target window.
+     */
+    var targetWorkArea: Rectangle? = null
+        private set
+
+    /**
      * Captures the currently active window so subsequent [arrange] calls apply
      * to it.
      */
     fun captureTargetWindow() {
-        targetWindow = windowManager.getActiveWindowId()
-        logger.info { "Captured target window: ${targetWindow.format()}" }
+        val window = windowManager.getActiveWindowId()
+        val bounds = window?.let { windowManager.getWindowBounds(it) }
+        targetWindow = window
+        targetWorkArea = bounds?.let(::monitorWorkAreaForWindowBounds)
+        logger.info { "Captured target window: ${window.format()}, bounds=$bounds, workArea=$targetWorkArea" }
     }
 
     /**
@@ -51,8 +63,9 @@ class ArrangementController(
         workArea: Rectangle,
     ): Rectangle? {
         val window = targetWindow
+        val effectiveWorkArea = targetWorkArea ?: workArea
         val positions = if (window != null) findKeyPositions(keyLabels, selectedKeys) else emptyList()
-        val bounds = computeSelectedBounds(rowWeights, columnWeights, positions, workArea)
+        val bounds = computeSelectedBounds(rowWeights, columnWeights, positions, effectiveWorkArea)
 
         return when {
             window == null -> {
