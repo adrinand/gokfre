@@ -136,11 +136,9 @@ fun GokfreWindow(
                 window.skipTaskbarX11()
             }
 
-            window.background = java.awt.Color(0, 0, 0, 0)
-            window.contentPane?.background = java.awt.Color(0, 0, 0, 0)
             window.setOpacitySafely(0f)
             window.bounds = arrangementController.targetWorkArea ?: window.workAreaBounds()
-            window.focusableWindowState = false
+            window.focusableWindowState = visible
         }
 
         Box(
