@@ -33,6 +33,7 @@ import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.awt.Rectangle
 import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
@@ -45,6 +46,7 @@ const val PREVIEW_WINDOW_TITLE = "Gokfre Preview"
 
 private const val SHOW_POLL_INTERVAL_MS = 100L
 private const val MAX_SHOW_WAIT_MS = 500L
+private const val FULLSCREEN_WAIT_TIMEOUT_MS = 2_000L
 private const val FADE_IN_MS = 100
 private const val FADE_OUT_MS = 60
 private const val MAX_SELECTED_KEYS = 2
@@ -59,6 +61,7 @@ fun GokfreWindow(
     var composeWindow by remember { mutableStateOf<ComposeWindow?>(null) }
     var previewReady by remember { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf<List<String>>(emptyList()) }
+    var lastWorkArea by remember { mutableStateOf<Rectangle?>(null) }
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -201,6 +204,13 @@ fun GokfreWindow(
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
         val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
+        val previousWorkArea = lastWorkArea
+        lastWorkArea = workArea
+        if (previousWorkArea != null && !previousWorkArea.intersects(workArea)) {
+            // The preview stays maximized while hidden; a maximized window
+            // ignores client-side moves, so restore before switching monitors.
+            arrangementController.windowManager.exitFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+        }
         win.bounds = workArea
         win.focusableWindowState = true
         if (!isLinux()) {
@@ -211,6 +221,10 @@ fun GokfreWindow(
         focusRequester.requestFocus()
         win.setOpacitySafely(1f)
         previewReady = true
+
+        win.isResizable = true
+        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+        win.isResizable = false
     }
 }
 

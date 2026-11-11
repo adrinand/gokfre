@@ -2,7 +2,6 @@ package com.adrinand.gokfre
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,7 +78,6 @@ fun runGokfreApplication(
         var windowManager by remember { mutableStateOf<WindowManager?>(null) }
         var arrangementController by remember { mutableStateOf<ArrangementController?>(null) }
         var isWindowVisible by remember { mutableStateOf(false) }
-        var previewWindowKey by remember { mutableStateOf(0) }
         var showSettings by remember { mutableStateOf(false) }
         var showPermissionWarning by remember { mutableStateOf(false) }
         val trayIcon = remember { createTrayIcon() }
@@ -107,11 +105,6 @@ fun runGokfreApplication(
             if (controller != null) {
                 if (!isWindowVisible) {
                     controller.captureTargetWindow()
-                    // Always recreate the preview window on open. Reusing the same
-                    // XWayland/Compose window after it has been hidden can leave it
-                    // with a stale or black background on GNOME Wayland, especially
-                    // when moving across monitors.
-                    previewWindowKey++
                 }
                 isWindowVisible = !isWindowVisible
                 logger.info("Preview window visible=$isWindowVisible")
@@ -128,15 +121,13 @@ fun runGokfreApplication(
             toggleDispatcher = toggleDispatcher,
         )
 
-        key(previewWindowKey) {
-            arrangementController?.let { controller ->
-                GokfreWindow(
-                    visible = isWindowVisible,
-                    onClose = { isWindowVisible = false },
-                    viewModel = settingsViewModel,
-                    arrangementController = controller,
-                )
-            }
+        arrangementController?.let { controller ->
+            GokfreWindow(
+                visible = isWindowVisible,
+                onClose = { isWindowVisible = false },
+                viewModel = settingsViewModel,
+                arrangementController = controller,
+            )
         }
 
         GokfreTray(
