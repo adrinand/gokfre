@@ -73,7 +73,10 @@ This repo is configured for opencode:
 ### Definition of done (mandatory)
 
 An implementation task is not finished until the work is reviewed, committed,
-pushed, and has a PR. Before reporting completion, the parent agent must:
+pushed, and has a PR. This is unconditional: implementation agents must commit,
+push, and ensure a draft PR exists even when the user did not explicitly ask, so
+the branch is available for review and local testing. Before reporting
+completion, the parent agent must:
 
 1. Run `./gradlew check` (plus `cargo test` / `./gradlew e2e` when the change
    touches those areas).
@@ -92,6 +95,9 @@ pushed, and has a PR. Before reporting completion, the parent agent must:
 Review subagents are read-only, so the parent agent performs the commit, push,
 and PR steps. If pushing or PR creation is impossible (no remote, missing auth),
 say so explicitly instead of silently finishing.
+
+Implementation agents must always push. Never leave implementation work only in
+the local working tree; pushing is part of the task, not an optional follow-up.
 
 ## Conventions
 
