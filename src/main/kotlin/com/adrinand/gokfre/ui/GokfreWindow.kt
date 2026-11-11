@@ -45,7 +45,6 @@ const val PREVIEW_WINDOW_TITLE = "Gokfre Preview"
 
 private const val SHOW_POLL_INTERVAL_MS = 100L
 private const val MAX_SHOW_WAIT_MS = 500L
-private const val FULLSCREEN_WAIT_TIMEOUT_MS = 2_000L
 private const val FADE_IN_MS = 100
 private const val FADE_OUT_MS = 60
 private const val MAX_SELECTED_KEYS = 2
@@ -92,7 +91,7 @@ fun GokfreWindow(
         logger.info { "onKeyPressed: selectedKeys=$selectedKeys" }
         if (selectedKeys.size == MAX_SELECTED_KEYS) {
             val win = composeWindow ?: return
-            val workArea = win.workAreaBounds()
+            val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
             val keysToArrange = selectedKeys
             logger.info { "onKeyPressed: arranging then closing preview" }
             coroutineScope.launch {
@@ -191,7 +190,6 @@ fun GokfreWindow(
         logger.info {
             "LaunchedEffect: showing preview, isVisible=${win.isVisible}, isShowing=${win.isShowing}"
         }
-        win.bounds = win.workAreaBounds()
         win.setOpacitySafely(0f)
         win.isAlwaysOnTop = true
         var waitedMs = 0L
@@ -202,6 +200,8 @@ fun GokfreWindow(
         if (!win.isShowing) {
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
+        val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
+        win.bounds = workArea
         win.focusableWindowState = true
         if (!isLinux()) {
             focusAppWindow()
@@ -211,10 +211,6 @@ fun GokfreWindow(
         focusRequester.requestFocus()
         win.setOpacitySafely(1f)
         previewReady = true
-
-        win.isResizable = true
-        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-        win.isResizable = false
     }
 }
 

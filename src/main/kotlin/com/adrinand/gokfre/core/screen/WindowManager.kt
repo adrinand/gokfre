@@ -15,6 +15,15 @@ interface WindowManager {
     fun getActiveWindowId(): WindowHandle?
 
     /**
+     * Returns the current screen bounds of [window], or `null` if they cannot
+     * be determined.
+     *
+     * Used to find the monitor that hosts the target window so the preview and
+     * the arrangement both operate on that monitor.
+     */
+    fun getWindowBounds(window: WindowHandle): Rectangle?
+
+    /**
      * Moves and resizes [window] to [bounds] in screen coordinates.
      */
     fun setWindowBounds(
@@ -32,6 +41,17 @@ interface WindowManager {
      * be applied, returning `true` if fullscreen was confirmed.
      */
     suspend fun enterFullscreen(
+        window: Window,
+        timeoutMs: Long,
+    ): Boolean
+
+    /**
+     * Un-maximizes the Gokfre preview [window] and waits for the state to be
+     * applied, returning `true` if the window is no longer maximized.
+     *
+     * The preview must be restored before it can be moved to another monitor.
+     */
+    suspend fun exitFullscreen(
         window: Window,
         timeoutMs: Long,
     ): Boolean

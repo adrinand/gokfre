@@ -146,6 +146,22 @@
         report({ ok: activate(window) });
     }
 
+    function bounds() {
+        var window = findWindowById(REQUEST.windowId) || activeWindow();
+        if (!window) {
+            report({ ok: false, error: 'no window' });
+            return;
+        }
+        var geometry = frameGeometry(window);
+        report({
+            ok: true,
+            x: geometry.x,
+            y: geometry.y,
+            width: geometry.width,
+            height: geometry.height
+        });
+    }
+
     function moveResize() {
         var window = findWindowById(REQUEST.windowId) || activeWindow();
         if (!window) {
@@ -208,6 +224,16 @@
         report({ ok: true, maximized: isMaximized(window) });
     }
 
+    function restorePreview() {
+        var window = previewWindow();
+        if (!window) {
+            report({ ok: false, error: 'preview window not found' });
+            return;
+        }
+        unmaximize(window);
+        report({ ok: true, maximized: isMaximized(window) });
+    }
+
     function probe() {
         report({ ok: true });
     }
@@ -220,6 +246,9 @@
         case 'focus':
             focus();
             break;
+        case 'bounds':
+            bounds();
+            break;
         case 'moveResize':
             moveResize();
             break;
@@ -228,6 +257,9 @@
             break;
         case 'isPreviewMaximized':
             isPreviewMaximized();
+            break;
+        case 'restorePreview':
+            restorePreview();
             break;
         case 'probe':
             probe();

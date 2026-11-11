@@ -39,6 +39,15 @@ internal object NativeMacWindowSource : MacWindowSource {
         }
     }
 
+    override fun windowBounds(pid: Long): Rectangle? {
+        val appElement = createAppElement(pid) ?: return null
+        return try {
+            readWindowBounds(app, appElement)
+        } finally {
+            release(appElement)
+        }
+    }
+
     override fun setBounds(
         pid: Long,
         bounds: Rectangle,
@@ -112,22 +121,16 @@ internal interface CoreGraphicsServices : Library {
     }
 }
 
-private const val CG_WINDOW_LIST_ON_SCREEN_ONLY = 1
-private const val CG_WINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS = 1 shl 4
-private const val CG_NULL_WINDOW_ID = 0
-private const val CG_NORMAL_WINDOW_LAYER = 0
-private val kOwnerPidAttribute: CFStringRef by lazy { CFStringRef.createCFString("kCGWindowOwnerPID") }
-private val kLayerAttribute: CFStringRef by lazy { CFStringRef.createCFString("kCGWindowLayer") }
-private val kAlphaAttribute: CFStringRef by lazy { CFStringRef.createCFString("kCGWindowAlpha") }
-
 private object CoreGraphicsWindowList {
     private val logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacWindowList")
+    private const val CG_WINDOW_LIST_ON_SCREEN_ONLY = 1
+    private const val CG_WINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS = 1 shl 4
+    private const val CG_NULL_WINDOW_ID = 0
+    private const val CG_NORMAL_WINDOW_LAYER = 0
+    private val kOwnerPidAttribute: CFStringRef by lazy { CFStringRef.createCFString("kCGWindowOwnerPID") }
+    private val kLayerAttribute: CFStringRef by lazy { CFStringRef.createCFString("kCGWindowLayer") }
+    private val kAlphaAttribute: CFStringRef by lazy { CFStringRef.createCFString("kCGWindowAlpha") }
 
-    /**
-     * Returns the process ID owning the frontmost normal window, ignoring Gokfre
-     * itself. Used when the system-wide accessibility element cannot report the
-     * focused application.
-     */
     fun frontmostOwnerPid(selfPid: Long): Long? =
         runCatching {
             val windows =
@@ -135,12 +138,12 @@ private object CoreGraphicsWindowList {
                     CG_WINDOW_LIST_ON_SCREEN_ONLY or CG_WINDOW_LIST_EXCLUDE_DESKTOP_ELEMENTS,
                     CG_NULL_WINDOW_ID,
                 )
-            if (windows == null || windows.pointer == null) {
+            if (windows?.pointer == null) {
                 logger.warning { "CGWindowListCopyWindowInfo returned no windows" }
                 return@runCatching null
             }
             try {
-                (0 until windows.getCount()).firstNotNullOfOrNull { index ->
+                (0 until windows.count).firstNotNullOfOrNull { index ->
                     runCatching { normalWindowOwnerPid(windows, index, selfPid) }
                         .onFailure { logger.fine { "Skipping window entry $index: ${it.message}" } }
                         .getOrNull()

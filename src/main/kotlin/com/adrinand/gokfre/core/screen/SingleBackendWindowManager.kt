@@ -26,6 +26,11 @@ abstract class SingleBackendWindowManager<H : WindowHandle> : WindowManager {
     protected abstract fun retrieveActiveWindow(): H?
 
     /**
+     * Returns the current bounds of [handle].
+     */
+    protected abstract fun retrieveBounds(handle: H): Rectangle?
+
+    /**
      * Moves and resizes [handle] to [bounds].
      */
     protected abstract fun applyBounds(
@@ -39,6 +44,11 @@ abstract class SingleBackendWindowManager<H : WindowHandle> : WindowManager {
     protected abstract fun focusHandle(handle: H)
 
     final override fun getActiveWindowId(): WindowHandle? = retrieveActiveWindow()
+
+    final override fun getWindowBounds(window: WindowHandle): Rectangle? {
+        val handle = castHandle(window) ?: return null
+        return retrieveBounds(handle)
+    }
 
     final override fun setWindowBounds(
         window: WindowHandle,

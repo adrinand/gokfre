@@ -29,6 +29,9 @@ const DBUS_INTERFACE = `
     <method name="MaximizePreview">
       <arg type="b" direction="out" name="success"/>
     </method>
+    <method name="RestorePreview">
+      <arg type="b" direction="out" name="success"/>
+    </method>
     <method name="IsPreviewMaximized">
       <arg type="b" direction="out" name="maximized"/>
     </method>
@@ -107,6 +110,22 @@ class GokfreDBus {
             return [true];
         } catch (e) {
             console.error('[gokfre] MaximizePreview error: ' + e);
+            return [false];
+        }
+    }
+
+    RestorePreview() {
+        const preview = findPreviewWindow();
+        if (!preview) {
+            return [false];
+        }
+        try {
+            if (preview.get_maximized() !== 0) {
+                preview.unmaximize(Meta.MaximizeFlags.BOTH);
+            }
+            return [true];
+        } catch (e) {
+            console.error('[gokfre] RestorePreview error: ' + e);
             return [false];
         }
     }
