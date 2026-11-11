@@ -204,27 +204,30 @@ fun GokfreWindow(
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
         val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
-        val previousWorkArea = lastWorkArea
+        val sameMonitor = lastWorkArea?.intersects(workArea) ?: false
         lastWorkArea = workArea
-        if (previousWorkArea != null && !previousWorkArea.intersects(workArea)) {
-            // The preview stays maximized while hidden; a maximized window
-            // ignores client-side moves, so restore before switching monitors.
-            arrangementController.windowManager.exitFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-        }
-        win.bounds = workArea
         win.focusableWindowState = true
+        win.isResizable = true
+        if (sameMonitor) {
+            arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+        } else {
+            // Atomic unmaximize + move + maximize, shell-side on GNOME. Moving
+            // a maximized window with client-side bounds races the WM and can
+            // leave the preview maximized on the previous monitor.
+            arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+        }
+        win.isResizable = false
         if (!isLinux()) {
             focusAppWindow()
         }
+        // Shell-side activation bypasses Mutter focus-stealing prevention after
+        // arrange() has just activated the target app; AWT calls as fallback.
+        arrangementController.windowManager.focusPreview(win)
         win.toFront()
         win.requestFocus()
         focusRequester.requestFocus()
         win.setOpacitySafely(1f)
         previewReady = true
-
-        win.isResizable = true
-        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-        win.isResizable = false
     }
 }
 

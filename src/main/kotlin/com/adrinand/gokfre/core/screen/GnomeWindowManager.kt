@@ -128,6 +128,46 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
             }
         }
 
+    override suspend fun placePreview(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ) {
+        val placed =
+            withContext(Dispatchers.IO) {
+                val output =
+                    callMethod(
+                        "PlacePreview",
+                        listOf(
+                            bounds.x.toString(),
+                            bounds.y.toString(),
+                            bounds.width.toString(),
+                            bounds.height.toString(),
+                        ),
+                        timeoutMs = CALL_TIMEOUT_MS,
+                    )
+                output != null &&
+                    parseLeadingBoolean(output.trim()) == true &&
+                    waitForMaximized(timeoutMs, expected = true)
+            }
+        if (placed) {
+            window.bounds = bounds
+        } else {
+            super.placePreview(window, bounds, timeoutMs)
+        }
+    }
+
+    override suspend fun focusPreview(window: Window) {
+        val activated =
+            withContext(Dispatchers.IO) {
+                val output = callMethod("FocusPreview", timeoutMs = CALL_TIMEOUT_MS)
+                output != null && parseLeadingBoolean(output.trim()) == true
+            }
+        if (!activated) {
+            super.focusPreview(window)
+        }
+    }
+
     private suspend fun waitForMaximized(
         timeoutMs: Long,
         expected: Boolean,

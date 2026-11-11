@@ -29,6 +29,16 @@ const DBUS_INTERFACE = `
     <method name="MaximizePreview">
       <arg type="b" direction="out" name="success"/>
     </method>
+    <method name="PlacePreview">
+      <arg type="i" direction="in" name="x"/>
+      <arg type="i" direction="in" name="y"/>
+      <arg type="i" direction="in" name="width"/>
+      <arg type="i" direction="in" name="height"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="FocusPreview">
+      <arg type="b" direction="out" name="success"/>
+    </method>
     <method name="RestorePreview">
       <arg type="b" direction="out" name="success"/>
     </method>
@@ -110,6 +120,39 @@ class GokfreDBus {
             return [true];
         } catch (e) {
             console.error('[gokfre] MaximizePreview error: ' + e);
+            return [false];
+        }
+    }
+
+    PlacePreview(x, y, width, height) {
+        const preview = findPreviewWindow();
+        if (!preview) {
+            return [false];
+        }
+        try {
+            if (preview.get_maximized() !== 0) {
+                preview.unmaximize(Meta.MaximizeFlags.BOTH);
+            }
+            preview.move_resize_frame(true, x, y, width, height);
+            preview.maximize(Meta.MaximizeFlags.BOTH);
+            return [true];
+        } catch (e) {
+            console.error('[gokfre] PlacePreview error: ' + e);
+            return [false];
+        }
+    }
+
+    FocusPreview() {
+        const preview = findPreviewWindow();
+        if (!preview) {
+            return [false];
+        }
+        try {
+            const time = global.display.get_current_time_roundtrip();
+            preview.activate(time);
+            return [true];
+        } catch (e) {
+            console.error('[gokfre] FocusPreview error: ' + e);
             return [false];
         }
     }

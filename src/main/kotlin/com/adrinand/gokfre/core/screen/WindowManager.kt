@@ -55,4 +55,30 @@ interface WindowManager {
         window: Window,
         timeoutMs: Long,
     ): Boolean
+
+    /**
+     * Moves the Gokfre preview [window] to [bounds] and makes it fullscreen.
+     *
+     * Backends may override this to perform the restore/move/maximize sequence
+     * atomically (the GNOME extension does). The default keeps the historical
+     * client-side sequence used by X11, KDE, and macOS.
+     */
+    suspend fun placePreview(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ) {
+        exitFullscreen(window, timeoutMs)
+        window.bounds = bounds
+        enterFullscreen(window, timeoutMs)
+    }
+
+    /**
+     * Requests that the Gokfre preview [window] become the active/focused
+     * window. Defaults to AWT window activation.
+     */
+    suspend fun focusPreview(window: Window) {
+        window.toFront()
+        window.requestFocus()
+    }
 }
