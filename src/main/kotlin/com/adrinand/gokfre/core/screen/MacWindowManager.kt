@@ -11,64 +11,26 @@ import java.util.logging.Logger
  * operates on that application's focused window. macOS requires the user to
  * grant Accessibility permissions to Gokfre before these calls succeed.
  */
-class MacWindowManager : SingleBackendWindowManager<WindowHandle.Mac>() {
+class MacWindowManager internal constructor(
+    private val source: MacWindowSource,
+) : SingleBackendWindowManager<WindowHandle.Mac>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacWindowManager")
 
-    private val app = ApplicationServices.INSTANCE
+    constructor() : this(NativeMacWindowSource)
 
     override fun castHandle(window: WindowHandle): WindowHandle.Mac? = window as? WindowHandle.Mac
 
-    override fun retrieveActiveWindow(): WindowHandle.Mac? {
-        val systemWide = app.AXUIElementCreateSystemWide()
-        return try {
-            if (systemWide.pointer == null) {
-                logger.warning { "Failed to create system-wide accessibility element" }
-                null
-            } else {
-                buildMacHandle(systemWide)
-            }
-        } finally {
-            release(systemWide)
-        }
-    }
+    override fun retrieveActiveWindow(): WindowHandle.Mac? = buildMacHandle()
 
     override fun applyBounds(
         handle: WindowHandle.Mac,
         bounds: Rectangle,
     ) {
-        val appElement = app.AXUIElementCreateApplication(handle.pid.toInt())
-        if (appElement.pointer == null) {
-            logger.warning { "Failed to create accessibility element for pid ${handle.pid}" }
-            return
-        }
-        try {
-            val targetWindow = focusedWindow(app, appElement) ?: return
-            try {
-                setPosition(app, targetWindow, bounds.x.toDouble(), bounds.y.toDouble())
-                setSize(app, targetWindow, bounds.width.toDouble(), bounds.height.toDouble())
-            } finally {
-                release(targetWindow)
-            }
-        } finally {
-            release(appElement)
-        }
+        source.setBounds(handle.pid, bounds)
     }
 
     override fun focusHandle(handle: WindowHandle.Mac) {
-        val appElement = app.AXUIElementCreateApplication(handle.pid.toInt())
-        if (appElement.pointer == null) {
-            return
-        }
-        try {
-            val targetWindow = focusedWindow(app, appElement) ?: return
-            try {
-                app.AXUIElementPerformAction(targetWindow, kAXRaiseAction)
-            } finally {
-                release(targetWindow)
-            }
-        } finally {
-            release(appElement)
-        }
+        source.raise(handle.pid)
     }
 
     override suspend fun enterFullscreen(
@@ -76,15 +38,27 @@ class MacWindowManager : SingleBackendWindowManager<WindowHandle.Mac>() {
         timeoutMs: Long,
     ): Boolean = true
 
-    private fun buildMacHandle(systemWide: AXUIElementRef): WindowHandle.Mac? {
-        val focusedAppPointer = copyAttribute(app, systemWide, kAXFocusedApplicationAttribute) ?: return null
-        val focusedApp = AXUIElementRef(focusedAppPointer.pointer)
-        try {
-            val pid = readPid(app, focusedApp) ?: return null
-            val title = readWindowTitle(app, focusedApp)
-            return WindowHandle.Mac(pid = pid, title = title ?: "")
-        } finally {
-            release(focusedApp)
+    private fun buildMacHandle(): WindowHandle.Mac? {
+        val selfPid = ProcessHandle.current().pid()
+        val rawFocusedAppPid = source.focusedApplicationPid()
+        val focusedAppPid = rawFocusedAppPid?.takeIf { it != selfPid }
+        val focusedElementPid =
+            if (focusedAppPid == null) {
+                source.focusedElementPid()?.takeIf { it != selfPid && source.hasFocusedWindow(it) }
+            } else {
+                null
+            }
+        val pid =
+            (focusedAppPid ?: focusedElementPid ?: source.frontmostWindowPid(selfPid))
+                ?.takeIf { it != selfPid }
+        if (pid == null) {
+            logger.warning { "Could not determine the frontmost application or window" }
+            return null
         }
+        if (focusedAppPid != pid) {
+            logger.info { "Using fallback window pid=$pid (focused app pid=$rawFocusedAppPid)" }
+        }
+        val title = if (focusedAppPid == pid) source.windowTitle(pid) ?: "" else ""
+        return WindowHandle.Mac(pid = pid, title = title)
     }
 }

@@ -22,6 +22,7 @@ internal const val SIZE_MEMORY_SIZE = 16L
 internal const val COORDINATE_X_OFFSET = 0L
 internal const val COORDINATE_Y_OFFSET = 8L
 internal val kAXFocusedApplicationAttribute = CFStringRef.createCFString("AXFocusedApplication")
+internal val kAXFocusedUIElementAttribute = CFStringRef.createCFString("AXFocusedUIElement")
 internal val kAXFocusedWindowAttribute = CFStringRef.createCFString("AXFocusedWindow")
 internal val kAXPositionAttribute = CFStringRef.createCFString("AXPosition")
 internal val kAXSizeAttribute = CFStringRef.createCFString("AXSize")
@@ -132,6 +133,7 @@ internal fun copyAttribute(
     return if (error == AX_ERROR_SUCCESS && reference.value != null) {
         CFTypeRef(reference.value)
     } else {
+        logger.fine { "AXUIElementCopyAttributeValue(${attribute.stringValue()}) failed with error $error" }
         null
     }
 }
