@@ -25,12 +25,16 @@ interface WindowManager {
 
     /**
      * Returns the work area of the monitor hosting [window] in the backend's
-     * coordinate space, or `null` when the backend cannot resolve it.
+     * coordinate space, or `null` when it cannot be resolved.
      *
-     * Backends that operate in a different space than AWT (GNOME Wayland uses
-     * logical coordinates) override this so layout math never mixes spaces.
+     * The default resolves [bounds] against the AWT monitor layout. Backends
+     * that operate in a different space than AWT (GNOME Wayland uses logical
+     * coordinates) override this so layout math never mixes spaces.
      */
-    fun getWorkArea(window: WindowHandle): Rectangle? = null
+    fun getWorkArea(
+        window: WindowHandle,
+        bounds: Rectangle?,
+    ): Rectangle? = bounds?.let(::awtWorkAreaForWindowBounds)
 
     /**
      * Moves and resizes [window] to [bounds] in screen coordinates.

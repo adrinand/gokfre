@@ -28,7 +28,10 @@ class HeadlessWindowManager : WindowManager {
 
     override fun getWindowBounds(window: WindowHandle): Rectangle? = activeWindowBounds
 
-    override fun getWorkArea(window: WindowHandle): Rectangle? = activeWindowWorkArea
+    override fun getWorkArea(
+        window: WindowHandle,
+        bounds: Rectangle?,
+    ): Rectangle? = activeWindowWorkArea ?: super.getWorkArea(window, bounds)
 
     override fun setWindowBounds(
         window: WindowHandle,

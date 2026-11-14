@@ -113,7 +113,10 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
      * HiDPI monitors. The value is captured together with the active window to
      * avoid an extra blocking D-Bus call on the hotkey path.
      */
-    override fun getWorkArea(window: WindowHandle): Rectangle? = castHandle(window)?.let { capturedWorkArea }
+    override fun getWorkArea(
+        window: WindowHandle,
+        bounds: Rectangle?,
+    ): Rectangle? = castHandle(window)?.let { capturedWorkArea } ?: super.getWorkArea(window, bounds)
 
     override fun applyBounds(
         handle: WindowHandle.Wayland,

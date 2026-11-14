@@ -37,7 +37,7 @@ class ScreenUtilsTest {
     }
 
     @Test
-    fun `monitor work area uses the screen that hosts the window`() {
+    fun `AWT work area uses the screen that hosts the window`() {
         assumeFalse("Skipping: headless environment", GraphicsEnvironment.isHeadless())
         val frame = Frame()
         frame.addNotify()
@@ -46,7 +46,7 @@ class ScreenUtilsTest {
             val screen = config.bounds
             val windowBounds = Rectangle(screen.x + screen.width / 4, screen.y + screen.height / 4, 100, 100)
 
-            monitorWorkAreaForWindowBounds(windowBounds) shouldBe config.workAreaBounds()
+            awtWorkAreaForWindowBounds(windowBounds) shouldBe config.workAreaBounds()
         } finally {
             frame.dispose()
         }
@@ -56,6 +56,6 @@ class ScreenUtilsTest {
     fun `monitor work area is null when the window is outside every screen`() {
         val farAway = Rectangle(-1_000_000, -1_000_000, 100, 100)
 
-        monitorWorkAreaForWindowBounds(farAway) shouldBe null
+        awtWorkAreaForWindowBounds(farAway) shouldBe null
     }
 }
