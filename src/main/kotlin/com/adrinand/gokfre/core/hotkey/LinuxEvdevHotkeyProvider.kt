@@ -36,9 +36,6 @@ class LinuxEvdevHotkeyProvider(
             nativeCallback ?: object : GokfreHotkeyCallback {
                 override fun invoke() {
                     System.err.println("LinuxEvdevHotkeyProvider: native callback fired")
-                    // The evdev grab+forward path can deliver the same physical event twice
-                    // (physical device + forwarded virtual device). Coalesce rapid callbacks
-                    // so a single key press produces exactly one toggle.
                     if (!pending.compareAndSet(false, true)) {
                         return
                     }

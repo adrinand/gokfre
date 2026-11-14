@@ -204,16 +204,11 @@ fun GokfreWindow(
         val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
         val sameMonitor = lastWorkArea?.intersects(workArea) ?: false
         win.isResizable = true
-        // Focus as soon as the window is mapped. Placement below can wait for
-        // the compositor and must not gate keyboard input.
         arrangementController.windowManager.focusPreview(win)
         val placed =
             if (sameMonitor) {
                 arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
             } else {
-                // Atomic unmaximize + move + maximize, shell-side on GNOME. Moving
-                // a maximized window with client-side bounds races the WM and can
-                // leave the preview maximized on the previous monitor.
                 arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
             }
         lastWorkArea = if (placed) workArea else null
@@ -223,8 +218,6 @@ fun GokfreWindow(
         }
         win.setOpacitySafely(1f)
         previewReady = true
-        // Placement can move the preview across monitors; re-assert focus once
-        // it has settled without holding back the visible preview.
         arrangementController.windowManager.focusPreview(win)
         runCatching { focusRequester.requestFocus() }
             .onFailure { logger.warning { "re-request focus failed: $it" } }

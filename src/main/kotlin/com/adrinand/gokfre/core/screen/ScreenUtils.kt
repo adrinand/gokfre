@@ -28,13 +28,6 @@ fun GraphicsConfiguration.workAreaBounds(): Rectangle {
 
 /**
  * Returns the work area of the monitor that hosts AWT-space [windowBounds].
- *
- * The monitor containing the centre of the window wins; windows that span
- * monitors fall back to the monitor with the largest overlap. Returns `null`
- * when no screen device is available.
- *
- * Do not pass logical/compositor coordinates here: backends whose coordinate
- * space differs from AWT must resolve their own work area.
  */
 fun awtWorkAreaForWindowBounds(windowBounds: Rectangle): Rectangle? {
     if (GraphicsEnvironment.isHeadless()) {

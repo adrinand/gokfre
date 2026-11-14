@@ -44,8 +44,6 @@ class ArrangementController(
         val window = windowManager.getActiveWindowId()
         val bounds = window?.let { windowManager.getWindowBounds(it) }
         targetWindow = window
-        // The backend resolves the work area in its own coordinate space
-        // (GNOME reports logical rectangles).
         targetWorkArea = window?.let { windowManager.getWorkArea(it, bounds) }
         logger.info { "Captured target window: ${window.format()}, bounds=$bounds, workArea=$targetWorkArea" }
     }

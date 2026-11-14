@@ -90,7 +90,7 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override fun retrieveActiveWindow(): WindowHandle.Wayland? {
         val output = callMethod("CaptureActiveWindow")
         val success = output?.trim()?.let(::parseLeadingBoolean) == true
-        capturedWorkArea = if (success) output?.let(::parseCapturedWorkArea) else null
+        capturedWorkArea = if (success) output.let(::parseCapturedWorkArea) else null
         return if (success) WindowHandle.Wayland(BACKEND_NAME, WAYLAND_TOKEN) else null
     }
 
@@ -107,11 +107,6 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
 
     /**
      * Returns the work area in the extension's logical coordinate space.
-     *
-     * AWT can report native XWayland pixels when UI scaling is disabled, so
-     * resolving the work area client-side would mix coordinate spaces on
-     * HiDPI monitors. The value is captured together with the active window to
-     * avoid an extra blocking D-Bus call on the hotkey path.
      */
     override fun getWorkArea(
         window: WindowHandle,
@@ -160,13 +155,7 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 output != null &&
                     parseLeadingBoolean(output.trim()) == true &&
                     waitForMaximized(timeoutMs, expected = false)
-            if (restoredByExtension) {
-                true
-            } else {
-                // Older extensions lack RestorePreview; the preview is an
-                // XWayland window, so EWMH still works as a fallback.
-                X11Fullscreen.unsetFullscreen(window, timeoutMs)
-            }
+            restoredByExtension || X11Fullscreen.unsetFullscreen(window, timeoutMs)
         }
 
     override suspend fun placePreview(
@@ -175,8 +164,6 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         timeoutMs: Long,
     ): Boolean {
         if (capturedWorkArea == null) {
-            // Older extensions do not report logical work areas, so [bounds]
-            // came from AWT and the client-side fallback is the safe space.
             return super.placePreview(window, bounds, timeoutMs)
         }
         val placed =
