@@ -18,6 +18,8 @@ class HeadlessWindowManager : WindowManager {
 
     var activeWindowBounds: Rectangle? = null
 
+    var activeWindowWorkArea: Rectangle? = null
+
     override fun getActiveWindowId(): WindowHandle {
         val handle = WindowHandle.X11(DEFAULT_HEADLESS_WINDOW_ID)
         lastActiveWindowHandle = handle
@@ -25,6 +27,8 @@ class HeadlessWindowManager : WindowManager {
     }
 
     override fun getWindowBounds(window: WindowHandle): Rectangle? = activeWindowBounds
+
+    override fun getWorkArea(window: WindowHandle): Rectangle? = activeWindowWorkArea
 
     override fun setWindowBounds(
         window: WindowHandle,

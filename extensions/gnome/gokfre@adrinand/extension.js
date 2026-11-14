@@ -1,5 +1,6 @@
 import Gio from 'gi://Gio';
 import Meta from 'gi://Meta';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const DBUS_INTERFACE = `
@@ -7,6 +8,10 @@ const DBUS_INTERFACE = `
   <interface name="org.gnome.Shell.Extensions.Gokfre">
     <method name="CaptureActiveWindow">
       <arg type="b" direction="out" name="success"/>
+      <arg type="i" direction="out" name="x"/>
+      <arg type="i" direction="out" name="y"/>
+      <arg type="i" direction="out" name="width"/>
+      <arg type="i" direction="out" name="height"/>
     </method>
     <method name="GetCapturedWindow">
       <arg type="b" direction="out" name="hasWindow"/>
@@ -65,9 +70,17 @@ class GokfreDBus {
     CaptureActiveWindow() {
         capturedWindow = global.display.focus_window;
         if (!capturedWindow) {
-            return [false];
+            return [false, 0, 0, 0, 0];
         }
-        return [true];
+        try {
+            const monitor = capturedWindow.get_monitor();
+            const workspace = global.workspace_manager.get_active_workspace();
+            const rect = workspace.get_work_area_for_monitor(monitor);
+            return [true, rect.x, rect.y, rect.width, rect.height];
+        } catch (e) {
+            console.error('[gokfre] CaptureActiveWindow work area error: ' + e);
+            return [true, 0, 0, 0, 0];
+        }
     }
 
     GetCapturedWindow() {
@@ -149,8 +162,8 @@ class GokfreDBus {
         }
         try {
             const time = global.display.get_current_time_roundtrip();
-            preview.activate(time);
-            return [true];
+            Main.activateWindow(preview, time);
+            return [preview.has_focus()];
         } catch (e) {
             console.error('[gokfre] FocusPreview error: ' + e);
             return [false];

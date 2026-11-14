@@ -24,6 +24,15 @@ interface WindowManager {
     fun getWindowBounds(window: WindowHandle): Rectangle?
 
     /**
+     * Returns the work area of the monitor hosting [window] in the backend's
+     * coordinate space, or `null` when the backend cannot resolve it.
+     *
+     * Backends that operate in a different space than AWT (GNOME Wayland uses
+     * logical coordinates) override this so layout math never mixes spaces.
+     */
+    fun getWorkArea(window: WindowHandle): Rectangle? = null
+
+    /**
      * Moves and resizes [window] to [bounds] in screen coordinates.
      */
     fun setWindowBounds(
@@ -62,15 +71,19 @@ interface WindowManager {
      * Backends may override this to perform the restore/move/maximize sequence
      * atomically (the GNOME extension does). The default keeps the historical
      * client-side sequence used by X11, KDE, and macOS.
+     *
+     * Returns `true` when placement was applied.
      */
     suspend fun placePreview(
         window: Window,
         bounds: Rectangle,
         timeoutMs: Long,
-    ) {
-        exitFullscreen(window, timeoutMs)
+    ): Boolean {
+        if (!exitFullscreen(window, timeoutMs)) {
+            return false
+        }
         window.bounds = bounds
-        enterFullscreen(window, timeoutMs)
+        return enterFullscreen(window, timeoutMs)
     }
 
     /**

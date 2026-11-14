@@ -118,6 +118,8 @@ fun GokfreWindow(
         undecorated = true,
         transparent = true,
         title = PREVIEW_WINDOW_TITLE,
+        focusable = true,
+        alwaysOnTop = visible,
     ) {
         LaunchedEffect(Unit) {
             logger.info { "GokfreWindow content composed, window=$window, visible=$visible" }
@@ -140,8 +142,7 @@ fun GokfreWindow(
             }
 
             window.setOpacitySafely(0f)
-            window.bounds = arrangementController.targetWorkArea ?: window.workAreaBounds()
-            window.focusableWindowState = visible
+            window.bounds = window.workAreaBounds()
         }
 
         Box(
@@ -185,8 +186,6 @@ fun GokfreWindow(
         if (!visible) {
             logger.info { "LaunchedEffect: hiding preview" }
             previewReady = false
-            win.focusableWindowState = false
-            win.isAlwaysOnTop = false
             return@LaunchedEffect
         }
 
@@ -194,7 +193,6 @@ fun GokfreWindow(
             "LaunchedEffect: showing preview, isVisible=${win.isVisible}, isShowing=${win.isShowing}"
         }
         win.setOpacitySafely(0f)
-        win.isAlwaysOnTop = true
         var waitedMs = 0L
         while (!win.isShowing && waitedMs < MAX_SHOW_WAIT_MS) {
             delay(SHOW_POLL_INTERVAL_MS.milliseconds)
@@ -205,29 +203,31 @@ fun GokfreWindow(
         }
         val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
         val sameMonitor = lastWorkArea?.intersects(workArea) ?: false
-        lastWorkArea = workArea
-        win.focusableWindowState = true
         win.isResizable = true
-        if (sameMonitor) {
-            arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-        } else {
-            // Atomic unmaximize + move + maximize, shell-side on GNOME. Moving
-            // a maximized window with client-side bounds races the WM and can
-            // leave the preview maximized on the previous monitor.
-            arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
-        }
+        // Focus as soon as the window is mapped. Placement below can wait for
+        // the compositor and must not gate keyboard input.
+        arrangementController.windowManager.focusPreview(win)
+        val placed =
+            if (sameMonitor) {
+                arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+            } else {
+                // Atomic unmaximize + move + maximize, shell-side on GNOME. Moving
+                // a maximized window with client-side bounds races the WM and can
+                // leave the preview maximized on the previous monitor.
+                arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+            }
+        lastWorkArea = if (placed) workArea else null
         win.isResizable = false
         if (!isLinux()) {
             focusAppWindow()
         }
-        // Shell-side activation bypasses Mutter focus-stealing prevention after
-        // arrange() has just activated the target app; AWT calls as fallback.
-        arrangementController.windowManager.focusPreview(win)
-        win.toFront()
-        win.requestFocus()
-        focusRequester.requestFocus()
         win.setOpacitySafely(1f)
         previewReady = true
+        // Placement can move the preview across monitors; re-assert focus once
+        // it has settled without holding back the visible preview.
+        arrangementController.windowManager.focusPreview(win)
+        runCatching { focusRequester.requestFocus() }
+            .onFailure { logger.warning { "re-request focus failed: $it" } }
     }
 }
 

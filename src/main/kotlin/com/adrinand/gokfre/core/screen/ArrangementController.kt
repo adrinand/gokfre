@@ -44,7 +44,9 @@ class ArrangementController(
         val window = windowManager.getActiveWindowId()
         val bounds = window?.let { windowManager.getWindowBounds(it) }
         targetWindow = window
-        targetWorkArea = bounds?.let(::monitorWorkAreaForWindowBounds)
+        targetWorkArea =
+            window?.let { windowManager.getWorkArea(it) }
+                ?: bounds?.let(::monitorWorkAreaForWindowBounds)
         logger.info { "Captured target window: ${window.format()}, bounds=$bounds, workArea=$targetWorkArea" }
     }
 

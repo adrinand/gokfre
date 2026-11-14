@@ -66,6 +66,34 @@ class ArrangementControllerTest {
     }
 
     @Test
+    fun `capture prefers the backend work area over AWT resolution`() {
+        runBlocking {
+            val backendWorkArea = Rectangle(100, 200, 300, 400)
+            val windowManager =
+                HeadlessWindowManager().apply {
+                    activeWindowBounds = Rectangle(10, 10, 100, 100)
+                    activeWindowWorkArea = backendWorkArea
+                }
+            val controller = ArrangementController(windowManager)
+            controller.captureTargetWindow()
+
+            controller.targetWorkArea shouldBe backendWorkArea
+
+            val bounds =
+                controller.arrange(
+                    rowWeights = listOf(1),
+                    columnWeights = listOf(1),
+                    keyLabels = listOf(listOf("Q")),
+                    selectedKeys = listOf("Q"),
+                    workArea = Rectangle(0, 0, 100, 100),
+                )
+
+            bounds shouldBe backendWorkArea
+            windowManager.lastBounds shouldBe backendWorkArea
+        }
+    }
+
+    @Test
     fun `arrange returns null when no target window was captured`() {
         runBlocking {
             val controller = ArrangementController(HeadlessWindowManager())
