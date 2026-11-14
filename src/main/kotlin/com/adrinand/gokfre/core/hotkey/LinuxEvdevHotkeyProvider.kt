@@ -3,8 +3,11 @@ package com.adrinand.gokfre.core.hotkey
 import com.adrinand.gokfre.core.hotkey.GokfreHotkeyNative.GokfreHotkeyCallback
 import com.sun.jna.Pointer
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.logging.Logger
 import javax.swing.SwingUtilities
 import javax.swing.Timer
+
+private val logger = Logger.getLogger("com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider")
 
 /**
  * [GlobalHotkeyProvider] backed by the Rust `kbd-global` / evdev library.
@@ -35,7 +38,7 @@ class LinuxEvdevHotkeyProvider(
         val callbackToRegister =
             nativeCallback ?: object : GokfreHotkeyCallback {
                 override fun invoke() {
-                    System.err.println("LinuxEvdevHotkeyProvider: native callback fired")
+                    logger.fine { "Native callback fired" }
                     if (!pending.compareAndSet(false, true)) {
                         return
                     }
