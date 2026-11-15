@@ -81,7 +81,9 @@ class ArrangementTest {
                     if (after != before) {
                         return after
                     }
-                    lastFailure = "target window bounds did not change after '${case.description}'"
+                    lastFailure =
+                        "target window bounds did not change after '${case.description}' " +
+                            "(${target.describeGeometry()})"
                 } else {
                     sendKeyToWindow(preview, KeyEvent.VK_ESCAPE)
                     waitForPreviewClosed(ESCAPE_CLOSE_TIMEOUT_MS)

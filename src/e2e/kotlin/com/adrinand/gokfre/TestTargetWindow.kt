@@ -78,6 +78,33 @@ class TestTargetWindow(
         SwingUtilities.invokeAndWait { frame.isAlwaysOnTop = false }
     }
 
+    /**
+     * Reports the AWT and X11 views of the window so E2E failures can tell
+     * whether the compositor or the AWT event queue is out of sync.
+     */
+    fun describeGeometry(): String {
+        val awt = bounds
+        val x11 =
+            runCatching {
+                val id =
+                    ProcessBuilder("xdotool", "search", "--name", frame.title)
+                        .redirectErrorStream(true)
+                        .start()
+                        .inputStream
+                        .bufferedReader()
+                        .readText()
+                        .lineSequence()
+                        .firstOrNull()
+                        ?: return@runCatching "not found"
+                val process = ProcessBuilder("xdotool", "getwindowgeometry", "--shell", id).start()
+                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                process.inputStream.bufferedReader().readText().lineSequence()
+                    .filter { it.startsWith("X=") || it.startsWith("Y=") || it.startsWith("WIDTH=") || it.startsWith("HEIGHT=") }
+                    .joinToString(",")
+            }.getOrNull()
+        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} x11=$x11"
+    }
+
     fun close() {
         SwingUtilities.invokeAndWait { frame.dispose() }
     }
