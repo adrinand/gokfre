@@ -84,25 +84,23 @@ class TestTargetWindow(
      */
     fun describeGeometry(): String {
         val awt = bounds
-        val x11 =
+        fun run(vararg command: String): String =
             runCatching {
-                val id =
-                    ProcessBuilder("xdotool", "search", "--name", frame.title)
-                        .redirectErrorStream(true)
-                        .start()
-                        .inputStream
-                        .bufferedReader()
-                        .readText()
-                        .lineSequence()
-                        .firstOrNull()
-                        ?: return@runCatching "not found"
-                val process = ProcessBuilder("xdotool", "getwindowgeometry", "--shell", id).start()
+                val process = ProcessBuilder(*command).redirectErrorStream(true).start()
                 process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                process.inputStream.bufferedReader().readText().lineSequence()
-                    .filter { it.startsWith("X=") || it.startsWith("Y=") || it.startsWith("WIDTH=") || it.startsWith("HEIGHT=") }
-                    .joinToString(",")
-            }.getOrNull()
-        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} x11=$x11"
+                process.inputStream.bufferedReader().readText().trim()
+            }.getOrDefault("failed")
+        val ids = run("xdotool", "search", "--name", frame.title).lineSequence().filter { it.isNotBlank() }
+        val geometries =
+            ids.joinToString("; ") { id ->
+                val geometry = run("xdotool", "getwindowgeometry", "--shell", id)
+                "id=$id ${geometry.replace('\n', ',')}"
+            }
+        val tree = run("xwininfo", "-root", "-tree").lineSequence()
+            .filter { it.contains(frame.title) || it.contains("Gokfre") }
+            .joinToString("; ")
+        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} " +
+            "x11=[$geometries] tree=[$tree]"
     }
 
     fun close() {
