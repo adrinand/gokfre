@@ -35,6 +35,10 @@ class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         }
         capturedId = reply.id
         capturedBounds = Rectangle(reply.x, reply.y, reply.width, reply.height)
+        logger.info {
+            "KWin active window: '${reply.title}' (${reply.id}) " +
+                "bounds=$capturedBounds"
+        }
         return WindowHandle.Wayland(BACKEND_NAME, reply.id)
     }
 
@@ -54,6 +58,8 @@ class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         val reply = runner()?.run(KdeScriptRenderer.moveResize(handle.token, bounds))
         if (reply?.ok != true) {
             logger.warning { "KDE script did not apply $bounds: ${reply?.error ?: "no reply"}" }
+        } else {
+            logger.info { "KDE script applied $bounds to ${handle.token}" }
         }
     }
 
