@@ -218,6 +218,9 @@ tasks {
         testClassesDirs = sourceSets["e2e"].output.classesDirs
         classpath = sourceSets["e2e"].runtimeClasspath
         shouldRunAfter("test")
+        // The tray is not under test and dorkbox aborts the JVM when a bare
+        // compositor session cannot initialize GTK for AppIndicator.
+        environment("GOKFRE_DISABLE_TRAY", "1")
     }
 }
 

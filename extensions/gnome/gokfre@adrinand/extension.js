@@ -58,6 +58,31 @@ const DBUS_NAME = 'org.gnome.Shell.Extensions.Gokfre';
 const DBUS_PATH = '/org/gnome/Shell/Extensions/Gokfre';
 const PREVIEW_TITLE = 'Gokfre Preview';
 
+// Mutter 49 replaced get_maximized() and the maximize/unmaximize flags
+// arguments with get_maximize_flags() and no-argument methods.
+function getMaximizeFlags(window) {
+    if (typeof window.get_maximize_flags === 'function') {
+        return window.get_maximize_flags();
+    }
+    return window.get_maximized();
+}
+
+function setMaximized(window, maximized) {
+    if (typeof window.get_maximize_flags === 'function') {
+        if (maximized) {
+            window.maximize();
+        } else {
+            window.unmaximize();
+        }
+        return;
+    }
+    if (maximized) {
+        window.maximize(Meta.MaximizeFlags.BOTH);
+    } else {
+        window.unmaximize(Meta.MaximizeFlags.BOTH);
+    }
+}
+
 let capturedWindow = null;
 
 function findPreviewWindow() {
@@ -96,8 +121,8 @@ class GokfreDBus {
             return [false];
         }
         try {
-            if (capturedWindow.get_maximized() !== 0) {
-                capturedWindow.unmaximize(Meta.MaximizeFlags.BOTH);
+            if (getMaximizeFlags(capturedWindow) !== 0) {
+                setMaximized(capturedWindow, false);
             }
             capturedWindow.move_resize_frame(true, x, y, width, height);
             return [true];
@@ -127,8 +152,8 @@ class GokfreDBus {
             return [false];
         }
         try {
-            if (preview.get_maximized() !== Meta.MaximizeFlags.BOTH) {
-                preview.maximize(Meta.MaximizeFlags.BOTH);
+            if (getMaximizeFlags(preview) !== Meta.MaximizeFlags.BOTH) {
+                setMaximized(preview, true);
             }
             return [true];
         } catch (e) {
@@ -143,11 +168,11 @@ class GokfreDBus {
             return [false];
         }
         try {
-            if (preview.get_maximized() !== 0) {
-                preview.unmaximize(Meta.MaximizeFlags.BOTH);
+            if (getMaximizeFlags(preview) !== 0) {
+                setMaximized(preview, false);
             }
             preview.move_resize_frame(true, x, y, width, height);
-            preview.maximize(Meta.MaximizeFlags.BOTH);
+            setMaximized(preview, true);
             return [true];
         } catch (e) {
             console.error('[gokfre] PlacePreview error: ' + e);
@@ -176,8 +201,8 @@ class GokfreDBus {
             return [false];
         }
         try {
-            if (preview.get_maximized() !== 0) {
-                preview.unmaximize(Meta.MaximizeFlags.BOTH);
+            if (getMaximizeFlags(preview) !== 0) {
+                setMaximized(preview, false);
             }
             return [true];
         } catch (e) {
@@ -191,7 +216,7 @@ class GokfreDBus {
         if (!preview) {
             return [false];
         }
-        return [preview.get_maximized() === Meta.MaximizeFlags.BOTH];
+        return [getMaximizeFlags(preview) === Meta.MaximizeFlags.BOTH];
     }
 }
 
