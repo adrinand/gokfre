@@ -6,12 +6,14 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
+import kotlin.math.roundToInt
 
 private const val DEFAULT_WIDTH = 800
 private const val DEFAULT_HEIGHT = 600
 private const val DEFAULT_X = 100
 private const val DEFAULT_Y = 100
 private const val COMMAND_TIMEOUT_SECONDS = 5L
+private val X11_WINDOW_ID = Regex("""\d+""")
 
 /**
  * A real Swing window used as the target for arrangement E2E tests.
@@ -27,6 +29,16 @@ class TestTargetWindow(
 ) {
     private val frame = JFrame("Gokfre E2E Target")
     private var x11WindowId: String? = null
+    private var useX11Geometry = false
+    private var lastX11Bounds: Rectangle? = null
+
+    private val awtScale: Double by lazy {
+        val holder = AtomicReference(1.0)
+        SwingUtilities.invokeAndWait {
+            holder.set(frame.graphicsConfiguration.defaultTransform.scaleX)
+        }
+        holder.get()
+    }
 
     init {
         SwingUtilities.invokeAndWait {
@@ -47,7 +59,17 @@ class TestTargetWindow(
      * the server and add [_NET_FRAME_EXTENTS]. Other platforms use AWT.
      */
     val bounds: Rectangle
-        get() = x11FrameBounds() ?: awtBounds
+        get() {
+            val x11 = x11FrameBounds()
+            if (x11 != null) {
+                useX11Geometry = true
+                lastX11Bounds = x11
+                return x11
+            }
+            // Once the X11 path works, never mix in AWT client bounds: they are
+            // a different coordinate space and would look like a geometry change.
+            return if (useX11Geometry) lastX11Bounds ?: awtBounds else awtBounds
+        }
 
     private val awtBounds: Rectangle
         get() {
@@ -118,14 +140,26 @@ class TestTargetWindow(
             val width = value("Width") ?: return@runCatching null
             val height = value("Height") ?: return@runCatching null
             val (left, right, top, bottom) = frameExtents(id) ?: return@runCatching null
-            Rectangle(x - left, y - top, width + left + right, height + top + bottom)
+            val native =
+                Rectangle(x - left, y - top, width + left + right, height + top + bottom)
+            if (awtScale == 1.0) {
+                native
+            } else {
+                Rectangle(
+                    (native.x / awtScale).roundToInt(),
+                    (native.y / awtScale).roundToInt(),
+                    (native.width / awtScale).roundToInt(),
+                    (native.height / awtScale).roundToInt(),
+                )
+            }
         }.getOrNull()
 
     private fun findX11WindowId(): String? {
         val ids =
             runCommand("xdotool", "search", "--name", frame.title)
                 .lineSequence()
-                .filter { it.isNotBlank() }
+                .filter { X11_WINDOW_ID.matches(it.trim()) }
+                .map { it.trim() }
                 .toList()
         // Window-manager frame windows can share the title but do not carry
         // frame extents; the client window does.
@@ -145,7 +179,15 @@ class TestTargetWindow(
 
     private fun runCommand(vararg command: String): String {
         val process = ProcessBuilder(*command).redirectErrorStream(true).start()
-        process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        return process.inputStream.bufferedReader().readText().trim()
+        try {
+            if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                error("Command timed out: ${command.joinToString(" ")}")
+            }
+            return process.inputStream.bufferedReader().use { it.readText().trim() }
+        } finally {
+            if (process.isAlive) {
+                process.destroyForcibly()
+            }
+        }
     }
 }

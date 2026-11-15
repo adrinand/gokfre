@@ -209,7 +209,9 @@ session bus. Design notes live here instead of in code comments.
 - **Settings persistence:** `SettingsRepository` auto-saves with a 500ms
   debounce. Closing the app too fast in tests can lose changes.
 - **Tray icon:** Linux uses dorkbox/SystemTray with AppIndicator. Can fail
-  silently on headless or unsupported desktops.
+  silently on headless or unsupported desktops. The E2E task sets
+  `GOKFRE_DISABLE_TRAY=1` because dorkbox's GTK thread aborts the JVM when GTK
+  cannot initialize on a bare compositor session.
 
 ## Non-goals
 

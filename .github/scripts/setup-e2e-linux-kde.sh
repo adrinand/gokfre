@@ -110,11 +110,8 @@ while [ "$SECONDS" -lt "$DEADLINE" ]; do
             continue
         fi
         if timeout 5 xdpyinfo -display ":$n" >/dev/null 2>&1; then
-            XWAYLAND_PID="$(xwayland_pid_for_display ":$n" || true)"
-            if [ -n "$XWAYLAND_PID" ]; then
-                DISPLAY_NUM=":$n"
-                break 2
-            fi
+            DISPLAY_NUM=":$n"
+            break 2
         elif [ -z "$XAUTHORITY_PATH" ]; then
             XWAYLAND_PID="$(xwayland_pid_for_display ":$n" || true)"
             if [ -n "$XWAYLAND_PID" ]; then
@@ -134,7 +131,7 @@ if [ -z "$DISPLAY_NUM" ]; then
     echo "X11 sockets:"
     ls -la /tmp/.X11-unix || true
     echo "Xwayland processes:"
-    pgrep -a Xwayland || true
+    pgrep -x Xwayland || true
     fail_with_log "Xwayland did not start"
 fi
 
@@ -142,7 +139,7 @@ export DISPLAY="$DISPLAY_NUM"
 echo "Using XWayland display $DISPLAY_NUM"
 
 if ! timeout 5 xdpyinfo >/dev/null 2>&1; then
-    fail_with_log "xdpyinfo failed for DISPLAY=$DISPLAY (XAUTHORITY=${XAUTHORITY:-})"
+    fail_with_log "xdpyinfo failed for DISPLAY=$DISPLAY"
 fi
 
 # Persist environment variables for subsequent workflow steps.
