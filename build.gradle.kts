@@ -2,6 +2,7 @@
 
 import org.gradle.language.jvm.tasks.ProcessResources
 import org.jetbrains.compose.ExperimentalComposeLibrary
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 group = "com.adrinand"
@@ -17,6 +18,17 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.kover)
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
+    }
 }
 
 sourceSets {
