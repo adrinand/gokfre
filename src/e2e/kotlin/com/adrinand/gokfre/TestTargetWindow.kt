@@ -26,6 +26,17 @@ class TestTargetWindow(
     private val frame = JFrame("Gokfre E2E Target")
 
     init {
+        frame.addComponentListener(
+            object : java.awt.event.ComponentAdapter() {
+                override fun componentResized(event: java.awt.event.ComponentEvent) {
+                    println("[e2e] target resized: ${frame.bounds} source=${event.component.javaClass.name}")
+                }
+
+                override fun componentMoved(event: java.awt.event.ComponentEvent) {
+                    println("[e2e] target moved: ${frame.bounds} source=${event.component.javaClass.name}")
+                }
+            },
+        )
         SwingUtilities.invokeAndWait {
             frame.setSize(width, height)
             frame.setLocation(x, y)
@@ -97,7 +108,8 @@ class TestTargetWindow(
                 .joinToString("; ") { id ->
                     "id=$id ${run("xdotool", "getwindowgeometry", "--shell", id).replace('\n', ',')}"
                 }
-        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} x11=[$geometries]"
+        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} x11=[$geometries] " +
+            "tree=[${run("xwininfo", "-root", "-tree").lineSequence().filter { it.contains(frame.title) }.joinToString("; ")}]"
     }
 
     fun close() {
