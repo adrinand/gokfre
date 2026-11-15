@@ -84,23 +84,20 @@ class TestTargetWindow(
      */
     fun describeGeometry(): String {
         val awt = bounds
+
         fun run(vararg command: String): String =
             runCatching {
                 val process = ProcessBuilder(*command).redirectErrorStream(true).start()
                 process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
                 process.inputStream.bufferedReader().readText().trim()
             }.getOrDefault("failed")
-        val ids = run("xdotool", "search", "--name", frame.title).lineSequence().filter { it.isNotBlank() }
         val geometries =
-            ids.joinToString("; ") { id ->
-                val geometry = run("xdotool", "getwindowgeometry", "--shell", id)
-                "id=$id ${geometry.replace('\n', ',')}"
-            }
-        val tree = run("xwininfo", "-root", "-tree").lineSequence()
-            .filter { it.contains(frame.title) || it.contains("Gokfre") }
-            .joinToString("; ")
-        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} " +
-            "x11=[$geometries] tree=[$tree]"
+            run("xdotool", "search", "--name", frame.title).lineSequence()
+                .filter { it.isNotBlank() }
+                .joinToString("; ") { id ->
+                    "id=$id ${run("xdotool", "getwindowgeometry", "--shell", id).replace('\n', ',')}"
+                }
+        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} x11=[$geometries]"
     }
 
     fun close() {
