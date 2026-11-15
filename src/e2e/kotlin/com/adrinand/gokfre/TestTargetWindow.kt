@@ -51,13 +51,6 @@ class TestTargetWindow(
         }
     }
 
-    /**
-     * Frame bounds of the window.
-     *
-     * On X11, AWT can lag behind compositor-initiated resizes (KWin may not
-     * deliver the configure event to the JVM at all), so read the geometry from
-     * the server and add [_NET_FRAME_EXTENTS]. Other platforms use AWT.
-     */
     val bounds: Rectangle
         get() {
             val x11 = x11FrameBounds()
@@ -66,8 +59,6 @@ class TestTargetWindow(
                 lastX11Bounds = x11
                 return x11
             }
-            // Once the X11 path works, never mix in AWT client bounds: they are
-            // a different coordinate space and would look like a geometry change.
             return if (useX11Geometry) lastX11Bounds ?: awtBounds else awtBounds
         }
 
@@ -113,10 +104,6 @@ class TestTargetWindow(
         SwingUtilities.invokeAndWait { frame.isAlwaysOnTop = false }
     }
 
-    /**
-     * Reports the AWT and X11 views of the window so E2E failures can tell
-     * whether the compositor or the AWT event queue is out of sync.
-     */
     fun describeGeometry(): String = "awt=$awtBounds x11=${x11FrameBounds() ?: "unavailable"}"
 
     fun close() {

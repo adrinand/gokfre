@@ -84,7 +84,7 @@ class ArrangementTest {
                     }
                     lastFailure =
                         "target window bounds did not change after '${case.description}' " +
-                        "(${target.describeGeometry()})"
+                            "(${target.describeGeometry()})"
                 } else {
                     sendKeyToWindow(preview, KeyEvent.VK_ESCAPE)
                     waitForPreviewClosed(ESCAPE_CLOSE_TIMEOUT_MS)
@@ -98,11 +98,6 @@ class ArrangementTest {
         error("$lastFailure after $MAX_ATTEMPTS attempts")
     }
 
-    /**
-     * X11 window managers apply geometry asynchronously, and AWT updates the
-     * Java-side bounds only after it processes the resulting configure event,
-     * so a single read right after the preview closes can still be stale.
-     */
     private fun waitForBoundsChange(
         target: TestTargetWindow,
         before: Rectangle,
