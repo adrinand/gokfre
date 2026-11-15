@@ -3,6 +3,7 @@
 import org.gradle.language.jvm.tasks.ProcessResources
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.adrinand"
 version = "1.0.0"
@@ -17,6 +18,17 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.kover)
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
+    }
 }
 
 sourceSets {
@@ -218,6 +230,9 @@ tasks {
         testClassesDirs = sourceSets["e2e"].output.classesDirs
         classpath = sourceSets["e2e"].runtimeClasspath
         shouldRunAfter("test")
+        // The tray is not under test and dorkbox aborts the JVM when a bare
+        // compositor session cannot initialize GTK for AppIndicator.
+        environment("GOKFRE_DISABLE_TRAY", "1")
     }
 }
 

@@ -113,7 +113,7 @@ fi
 # Fallback: probe displays; useful if the XWayland command line is unreadable.
 if [ -z "$DISPLAY_NUM" ]; then
     for n in $(seq 0 9); do
-        if [ -S "/tmp/.X11-unix/X$n" ] && xdpyinfo -display ":$n" >/dev/null 2>&1; then
+        if [ -S "/tmp/.X11-unix/X$n" ] && timeout 5 xdpyinfo -display ":$n" >/dev/null 2>&1; then
             DISPLAY_NUM=":$n"
             break
         fi
@@ -165,6 +165,7 @@ done
 
 if [ "$service_ready" -ne 1 ]; then
     echo "ERROR: GNOME extension D-Bus service is not reachable"
+    echo "GNOME Shell: $(gnome-shell --version 2>/dev/null || echo unknown)"
     gnome-extensions info gokfre@adrinand || true
     cat /tmp/gnome-shell.log || true
     kill "$SHELL_PID" 2>/dev/null || true

@@ -70,12 +70,15 @@ private interface KWinScript : DBusInterface {
 /**
  * Renders the KWin script resource for one operation.
  */
+@Suppress("TooManyFunctions")
 internal object KdeScriptRenderer {
     private val template: String by lazy { loadTemplate() }
 
     fun capture(): String = render("capture")
 
     fun focus(handleId: String): String = render("focus", handleId)
+
+    fun bounds(handleId: String): String = render("bounds", handleId)
 
     fun moveResize(
         handleId: String,
@@ -85,6 +88,8 @@ internal object KdeScriptRenderer {
     fun maximizePreview(): String = render("maximizePreview")
 
     fun isPreviewMaximized(): String = render("isPreviewMaximized")
+
+    fun restorePreview(): String = render("restorePreview")
 
     fun probe(): String = render("probe")
 

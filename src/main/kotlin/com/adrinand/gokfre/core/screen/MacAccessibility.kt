@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package com.adrinand.gokfre.core.screen
 
 import com.sun.jna.Library
@@ -10,6 +12,9 @@ import com.sun.jna.platform.mac.CoreFoundation.CFStringRef
 import com.sun.jna.platform.mac.CoreFoundation.CFTypeRef
 import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.PointerByReference
+import java.awt.Dimension
+import java.awt.Point
+import java.awt.Rectangle
 import java.util.logging.Logger
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacAccessibility")
@@ -174,6 +179,61 @@ internal fun readWindowTitle(
         }
     } finally {
         release(targetWindow)
+    }
+}
+
+internal fun readWindowBounds(
+    app: ApplicationServices,
+    appElement: AXUIElementRef,
+): Rectangle? {
+    val targetWindow = focusedWindow(app, appElement) ?: return null
+    return try {
+        val position = readPointAttribute(app, targetWindow, kAXPositionAttribute)
+        val size = readSizeAttribute(app, targetWindow, kAXSizeAttribute)
+        if (position != null && size != null) {
+            Rectangle(position.x, position.y, size.width, size.height)
+        } else {
+            null
+        }
+    } finally {
+        release(targetWindow)
+    }
+}
+
+private fun readPointAttribute(
+    app: ApplicationServices,
+    window: AXUIElementRef,
+    attribute: CFStringRef,
+): Point? {
+    val reference = copyAttribute(app, window, attribute) ?: return null
+    try {
+        val memory = Memory(POSITION_MEMORY_SIZE)
+        if (!app.AXValueGetValue(AXValueRef(reference.pointer), AX_VALUE_CGPOINT_TYPE, memory)) {
+            return null
+        }
+        return Point(memory.getDouble(COORDINATE_X_OFFSET).toInt(), memory.getDouble(COORDINATE_Y_OFFSET).toInt())
+    } finally {
+        release(reference)
+    }
+}
+
+private fun readSizeAttribute(
+    app: ApplicationServices,
+    window: AXUIElementRef,
+    attribute: CFStringRef,
+): Dimension? {
+    val reference = copyAttribute(app, window, attribute) ?: return null
+    try {
+        val memory = Memory(SIZE_MEMORY_SIZE)
+        if (!app.AXValueGetValue(AXValueRef(reference.pointer), AX_VALUE_CGSIZE_TYPE, memory)) {
+            return null
+        }
+        return Dimension(
+            memory.getDouble(COORDINATE_X_OFFSET).toInt(),
+            memory.getDouble(COORDINATE_Y_OFFSET).toInt(),
+        )
+    } finally {
+        release(reference)
     }
 }
 

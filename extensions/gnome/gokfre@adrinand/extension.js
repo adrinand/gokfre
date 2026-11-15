@@ -1,5 +1,6 @@
 import Gio from 'gi://Gio';
 import Meta from 'gi://Meta';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const DBUS_INTERFACE = `
@@ -7,6 +8,10 @@ const DBUS_INTERFACE = `
   <interface name="org.gnome.Shell.Extensions.Gokfre">
     <method name="CaptureActiveWindow">
       <arg type="b" direction="out" name="success"/>
+      <arg type="i" direction="out" name="x"/>
+      <arg type="i" direction="out" name="y"/>
+      <arg type="i" direction="out" name="width"/>
+      <arg type="i" direction="out" name="height"/>
     </method>
     <method name="GetCapturedWindow">
       <arg type="b" direction="out" name="hasWindow"/>
@@ -29,6 +34,19 @@ const DBUS_INTERFACE = `
     <method name="MaximizePreview">
       <arg type="b" direction="out" name="success"/>
     </method>
+    <method name="PlacePreview">
+      <arg type="i" direction="in" name="x"/>
+      <arg type="i" direction="in" name="y"/>
+      <arg type="i" direction="in" name="width"/>
+      <arg type="i" direction="in" name="height"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="FocusPreview">
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="RestorePreview">
+      <arg type="b" direction="out" name="success"/>
+    </method>
     <method name="IsPreviewMaximized">
       <arg type="b" direction="out" name="maximized"/>
     </method>
@@ -39,6 +57,31 @@ const DBUS_INTERFACE = `
 const DBUS_NAME = 'org.gnome.Shell.Extensions.Gokfre';
 const DBUS_PATH = '/org/gnome/Shell/Extensions/Gokfre';
 const PREVIEW_TITLE = 'Gokfre Preview';
+
+// Mutter 49 replaced get_maximized() and the maximize/unmaximize flags
+// arguments with get_maximize_flags() and no-argument methods.
+function getMaximizeFlags(window) {
+    if (typeof window.get_maximize_flags === 'function') {
+        return window.get_maximize_flags();
+    }
+    return window.get_maximized();
+}
+
+function setMaximized(window, maximized) {
+    if (typeof window.get_maximize_flags === 'function') {
+        if (maximized) {
+            window.maximize();
+        } else {
+            window.unmaximize();
+        }
+        return;
+    }
+    if (maximized) {
+        window.maximize(Meta.MaximizeFlags.BOTH);
+    } else {
+        window.unmaximize(Meta.MaximizeFlags.BOTH);
+    }
+}
 
 let capturedWindow = null;
 
@@ -52,9 +95,17 @@ class GokfreDBus {
     CaptureActiveWindow() {
         capturedWindow = global.display.focus_window;
         if (!capturedWindow) {
-            return [false];
+            return [false, 0, 0, 0, 0];
         }
-        return [true];
+        try {
+            const monitor = capturedWindow.get_monitor();
+            const workspace = global.workspace_manager.get_active_workspace();
+            const rect = workspace.get_work_area_for_monitor(monitor);
+            return [true, rect.x, rect.y, rect.width, rect.height];
+        } catch (e) {
+            console.error('[gokfre] CaptureActiveWindow work area error: ' + e);
+            return [true, 0, 0, 0, 0];
+        }
     }
 
     GetCapturedWindow() {
@@ -70,8 +121,8 @@ class GokfreDBus {
             return [false];
         }
         try {
-            if (capturedWindow.get_maximized() !== 0) {
-                capturedWindow.unmaximize(Meta.MaximizeFlags.BOTH);
+            if (getMaximizeFlags(capturedWindow) !== 0) {
+                setMaximized(capturedWindow, false);
             }
             capturedWindow.move_resize_frame(true, x, y, width, height);
             return [true];
@@ -101,12 +152,61 @@ class GokfreDBus {
             return [false];
         }
         try {
-            if (preview.get_maximized() !== Meta.MaximizeFlags.BOTH) {
-                preview.maximize(Meta.MaximizeFlags.BOTH);
+            if (getMaximizeFlags(preview) !== Meta.MaximizeFlags.BOTH) {
+                setMaximized(preview, true);
             }
             return [true];
         } catch (e) {
             console.error('[gokfre] MaximizePreview error: ' + e);
+            return [false];
+        }
+    }
+
+    PlacePreview(x, y, width, height) {
+        const preview = findPreviewWindow();
+        if (!preview) {
+            return [false];
+        }
+        try {
+            if (getMaximizeFlags(preview) !== 0) {
+                setMaximized(preview, false);
+            }
+            preview.move_resize_frame(true, x, y, width, height);
+            setMaximized(preview, true);
+            return [true];
+        } catch (e) {
+            console.error('[gokfre] PlacePreview error: ' + e);
+            return [false];
+        }
+    }
+
+    FocusPreview() {
+        const preview = findPreviewWindow();
+        if (!preview) {
+            return [false];
+        }
+        try {
+            const time = global.display.get_current_time_roundtrip();
+            Main.activateWindow(preview, time);
+            return [preview.has_focus()];
+        } catch (e) {
+            console.error('[gokfre] FocusPreview error: ' + e);
+            return [false];
+        }
+    }
+
+    RestorePreview() {
+        const preview = findPreviewWindow();
+        if (!preview) {
+            return [false];
+        }
+        try {
+            if (getMaximizeFlags(preview) !== 0) {
+                setMaximized(preview, false);
+            }
+            return [true];
+        } catch (e) {
+            console.error('[gokfre] RestorePreview error: ' + e);
             return [false];
         }
     }
@@ -116,7 +216,7 @@ class GokfreDBus {
         if (!preview) {
             return [false];
         }
-        return [preview.get_maximized() === Meta.MaximizeFlags.BOTH];
+        return [getMaximizeFlags(preview) === Meta.MaximizeFlags.BOTH];
     }
 }
 

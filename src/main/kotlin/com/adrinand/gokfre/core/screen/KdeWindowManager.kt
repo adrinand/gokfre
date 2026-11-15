@@ -20,6 +20,9 @@ private const val POLL_TIMEOUT_MS = 2_000L
 class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.KdeWindowManager")
 
+    private var capturedId: String? = null
+    private var capturedBounds: Rectangle? = null
+
     fun isAvailable(): Boolean = runner()?.run(KdeScriptRenderer.probe())?.ok == true
 
     override fun castHandle(window: WindowHandle): WindowHandle.Wayland? =
@@ -30,7 +33,18 @@ class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         if (!reply.ok) {
             return null
         }
+        capturedId = reply.id
+        capturedBounds = Rectangle(reply.x, reply.y, reply.width, reply.height)
         return WindowHandle.Wayland(BACKEND_NAME, reply.id)
+    }
+
+    override fun retrieveBounds(handle: WindowHandle.Wayland): Rectangle? {
+        val cached = capturedBounds?.takeIf { handle.token == capturedId }
+        if (cached != null) {
+            return cached
+        }
+        val reply = runner()?.run(KdeScriptRenderer.bounds(handle.token)) ?: return null
+        return if (reply.ok) Rectangle(reply.x, reply.y, reply.width, reply.height) else null
     }
 
     override fun applyBounds(
@@ -61,18 +75,33 @@ class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 logger.warning { "KDE script did not maximize the preview" }
                 return@withContext false
             }
-            waitForMaximized(runner, timeoutMs)
+            waitForMaximized(runner, timeoutMs, expected = true)
+        }
+
+    override suspend fun exitFullscreen(
+        window: Window,
+        timeoutMs: Long,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            val runner = runner() ?: return@withContext false
+            val reply = runner.run(KdeScriptRenderer.restorePreview()) ?: return@withContext false
+            if (!reply.ok) {
+                logger.warning { "KDE script did not restore the preview" }
+                return@withContext false
+            }
+            waitForMaximized(runner, timeoutMs, expected = false)
         }
 
     private suspend fun waitForMaximized(
         runner: KdeScriptRunner,
         timeoutMs: Long,
+        expected: Boolean,
     ): Boolean {
         delay(MAXIMIZE_SETTLE_MS.milliseconds)
         val deadline = TimeSource.Monotonic.markNow() + timeoutMs.milliseconds
         while (deadline.hasNotPassedNow()) {
             val reply = runner.run(KdeScriptRenderer.isPreviewMaximized(), POLL_TIMEOUT_MS)
-            if (reply?.maximized == true) {
+            if (reply?.maximized == expected) {
                 return true
             }
             delay(POLL_INTERVAL_MS.milliseconds)

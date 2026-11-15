@@ -64,6 +64,11 @@ class LinuxTrayManager(private val controller: TrayController) {
     private var tray: SystemTray? = null
 
     fun install() {
+        if (System.getenv("GOKFRE_DISABLE_TRAY") == "1") {
+            logger.info { "System tray disabled by GOKFRE_DISABLE_TRAY" }
+            return
+        }
+
         if (GraphicsEnvironment.isHeadless()) {
             logger.info { "Headless environment, skipping system tray" }
             return

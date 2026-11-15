@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 private const val ARRANGEMENT_TIMEOUT_MS = 5_000L
+private const val BOUNDS_SETTLE_TIMEOUT_MS = 8_000L
 private const val PREVIEW_SETTLE_MS = 500L
 private const val ESCAPE_CLOSE_TIMEOUT_MS = 2_000L
 private const val MAX_ATTEMPTS = 3
@@ -77,11 +78,12 @@ class ArrangementTest {
                 Thread.sleep(PREVIEW_SETTLE_MS)
                 case.keys.forEach { sendKeyToWindow(preview, keyCodeForChar(it)) }
                 if (waitForPreviewClosed(ARRANGEMENT_TIMEOUT_MS)) {
-                    val after = target.bounds
-                    if (after != before) {
+                    val after = waitForBoundsChange(target, before)
+                    if (after != null) {
                         return after
                     }
-                    lastFailure = "target window bounds did not change after '${case.description}'"
+                    lastFailure =
+                        "target window bounds did not change after '${case.description}' ($ { target.describeGeometry() })"
                 } else {
                     sendKeyToWindow(preview, KeyEvent.VK_ESCAPE)
                     waitForPreviewClosed(ESCAPE_CLOSE_TIMEOUT_MS)
@@ -93,6 +95,21 @@ class ArrangementTest {
             }
         }
         error("$lastFailure after $MAX_ATTEMPTS attempts")
+    }
+
+    private fun waitForBoundsChange(
+        target: TestTargetWindow,
+        before: Rectangle,
+    ): Rectangle? {
+        val deadline = System.currentTimeMillis() + BOUNDS_SETTLE_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            val after = target.bounds
+            if (after != before) {
+                return after
+            }
+            Thread.sleep(100L)
+        }
+        return null
     }
 
     private fun assertDistinct(results: List<Rectangle>) {

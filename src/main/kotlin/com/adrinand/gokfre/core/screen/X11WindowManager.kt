@@ -52,6 +52,16 @@ object X11WindowManager : SingleBackendWindowManager<WindowHandle.X11>() {
         }
     }
 
+    override fun retrieveBounds(handle: WindowHandle.X11): Rectangle? {
+        val x11 = X11.INSTANCE
+        val display = x11.XOpenDisplay(null) ?: return null
+        return try {
+            readGeometry(x11, display, handle.id)
+        } finally {
+            x11.XCloseDisplay(display)
+        }
+    }
+
     override fun applyBounds(
         handle: WindowHandle.X11,
         bounds: Rectangle,
@@ -121,6 +131,14 @@ object X11WindowManager : SingleBackendWindowManager<WindowHandle.X11>() {
             X11Fullscreen.waitForFullscreen(window, timeoutMs)
         }
 
+    override suspend fun exitFullscreen(
+        window: Window,
+        timeoutMs: Long,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            X11Fullscreen.unsetFullscreen(window, timeoutMs)
+        }
+
     private fun removeMaximizedState(
         atoms: X11Atoms,
         windowId: Long,
@@ -142,6 +160,54 @@ object X11WindowManager : SingleBackendWindowManager<WindowHandle.X11>() {
         val mask = NativeLong((X11.SubstructureRedirectMask or X11.SubstructureNotifyMask).toLong())
         atoms.x11.XSendEvent(atoms.display, atoms.root, 0, mask, event)
         atoms.x11.XFlush(atoms.display)
+    }
+
+    private fun readGeometry(
+        x11: X11,
+        display: X11.Display,
+        windowId: Long,
+    ): Rectangle? {
+        val rootReturn = X11.WindowByReference()
+        val x = IntByReference()
+        val y = IntByReference()
+        val width = IntByReference()
+        val height = IntByReference()
+        val borderWidth = IntByReference()
+        val depth = IntByReference()
+        val status =
+            x11.XGetGeometry(
+                display,
+                X11.Window(windowId),
+                rootReturn,
+                x,
+                y,
+                width,
+                height,
+                borderWidth,
+                depth,
+            )
+        if (status == 0) {
+            return null
+        }
+
+        val root = x11.XDefaultRootWindow(display)
+        val absoluteX = IntByReference()
+        val absoluteY = IntByReference()
+        val child = X11.WindowByReference()
+        val translated =
+            x11.XTranslateCoordinates(
+                display,
+                X11.Window(windowId),
+                root,
+                0,
+                0,
+                absoluteX,
+                absoluteY,
+                child,
+            )
+        val originX = if (translated) absoluteX.value else x.value
+        val originY = if (translated) absoluteY.value else y.value
+        return Rectangle(originX, originY, width.value, height.value)
     }
 
     private fun readWindowProperty(

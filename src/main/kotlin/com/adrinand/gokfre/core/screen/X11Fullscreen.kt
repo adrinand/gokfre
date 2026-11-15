@@ -25,6 +25,7 @@ private data class X11Data(
  * X11 fullscreen helper that requests `_NET_WM_STATE_MAXIMIZED_VERT | HORZ`
  * for the Gokfre preview window.
  */
+@Suppress("TooManyFunctions")
 object X11Fullscreen {
     private val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.X11Fullscreen")
     private const val NET_WM_STATE_REMOVE = 0L
@@ -80,6 +81,23 @@ object X11Fullscreen {
         }
     }
 
+    suspend fun unsetFullscreen(
+        window: Window,
+        timeoutMs: Long,
+    ): Boolean {
+        val x11 = X11.INSTANCE
+        val display = x11.XOpenDisplay(null) ?: return false
+        try {
+            val atoms = extractX11Data(x11, display)
+            val windowId = resolveWindowId(x11, display, atoms, window) ?: return false
+            requestMaximizeState(atoms, windowId, add = false)
+            x11.XFlush(display)
+            return waitForMaximizedState(atoms, windowId, timeoutMs, expected = false)
+        } finally {
+            x11.XCloseDisplay(display)
+        }
+    }
+
     suspend fun waitForFullscreen(
         window: Window,
         timeoutMs: Long,
@@ -88,20 +106,27 @@ object X11Fullscreen {
         val display = x11.XOpenDisplay(null) ?: return false
         try {
             val atoms = extractX11Data(x11, display)
-            val windowId = resolveWindowId(x11, display, atoms, window)
-            val deadline = TimeSource.Monotonic.markNow() + timeoutMs.milliseconds
-            var applied = false
-            while (!applied && deadline.hasNotPassedNow()) {
-                if (windowId != null && isMaximized(atoms, windowId)) {
-                    applied = true
-                } else {
-                    delay(FULLSCREEN_POLL_INTERVAL_MS.milliseconds)
-                }
-            }
-            return applied
+            val windowId = resolveWindowId(x11, display, atoms, window) ?: return false
+            return waitForMaximizedState(atoms, windowId, timeoutMs, expected = true)
         } finally {
             x11.XCloseDisplay(display)
         }
+    }
+
+    private suspend fun waitForMaximizedState(
+        atoms: X11Data,
+        windowId: Long,
+        timeoutMs: Long,
+        expected: Boolean,
+    ): Boolean {
+        val deadline = TimeSource.Monotonic.markNow() + timeoutMs.milliseconds
+        while (deadline.hasNotPassedNow()) {
+            if (isMaximized(atoms, windowId) == expected) {
+                return true
+            }
+            delay(FULLSCREEN_POLL_INTERVAL_MS.milliseconds)
+        }
+        return false
     }
 
     private fun resolveWindowId(

@@ -22,6 +22,8 @@ class MacWindowManager internal constructor(
 
     override fun retrieveActiveWindow(): WindowHandle.Mac? = buildMacHandle()
 
+    override fun retrieveBounds(handle: WindowHandle.Mac): Rectangle? = source.windowBounds(handle.pid)
+
     override fun applyBounds(
         handle: WindowHandle.Mac,
         bounds: Rectangle,
@@ -34,6 +36,11 @@ class MacWindowManager internal constructor(
     }
 
     override suspend fun enterFullscreen(
+        window: Window,
+        timeoutMs: Long,
+    ): Boolean = true
+
+    override suspend fun exitFullscreen(
         window: Window,
         timeoutMs: Long,
     ): Boolean = true

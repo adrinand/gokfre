@@ -80,43 +80,48 @@ fi
 
 echo "KWin running on Wayland socket $WAYLAND_SOCK (PID $KWIN_PID)"
 
-# KWin starts Xwayland rootless with "-displayfd" and no explicit ":N", so the
-# display number must be discovered by probing. It only passes "-auth" when
-# launched with --xwayland-xauthority; honour it if present.
+# KWin owns the X11 listening socket and spawns Xwayland lazily on first
+# connection. Probing triggers that start, so wait for a usable display rather
+# than for the process. An auth-protected server rejects the first probe, so
+# pick up the Xauthority file from the process it just started and retry.
+xwayland_pid_for_display() {
+    local display="$1" pid args
+    for pid in $(pgrep -x Xwayland 2>/dev/null || true); do
+        args="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+        if printf '%s' "$args" | grep -qF -- " $display "; then
+            printf '%s\n' "$pid"
+            return 0
+        fi
+    done
+    return 1
+}
+
 echo "Waiting for Xwayland..."
-XWAYLAND_PID=""
-for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
-    XWAYLAND_PID="$(pgrep -x Xwayland 2>/dev/null | head -n1 || true)"
-    if [ -n "$XWAYLAND_PID" ]; then
-        break
-    fi
-    if ! kill -0 "$KWIN_PID" 2>/dev/null; then
-        fail_with_log "KWin exited before Xwayland started"
-    fi
-    sleep "$WAIT_INTERVAL"
-done
-
-if [ -z "$XWAYLAND_PID" ]; then
-    fail_with_log "Xwayland did not start"
-fi
-
-XAUTHORITY_PATH=""
-XWAYLAND_CMDLINE="$(tr '\0' ' ' < "/proc/$XWAYLAND_PID/cmdline" 2>/dev/null || true)"
-XAUTHORITY_PATH="$(printf '%s' "$XWAYLAND_CMDLINE" | grep -oE '\-auth [^ ]+' | head -n1 | cut -d' ' -f2 || true)"
-if [ -n "$XAUTHORITY_PATH" ]; then
-    export XAUTHORITY="$XAUTHORITY_PATH"
-fi
-
-echo "Probing for the XWayland display..."
 DISPLAY_NUM=""
-for _ in $(seq 1 "$WAIT_ATTEMPTS"); do
+XWAYLAND_PID=""
+XAUTHORITY_PATH=""
+DEADLINE=$((SECONDS + 300))
+while [ "$SECONDS" -lt "$DEADLINE" ]; do
     if ! kill -0 "$KWIN_PID" 2>/dev/null; then
         fail_with_log "KWin exited before exposing an XWayland display"
     fi
     for n in $(seq 0 9); do
-        if [ -S "/tmp/.X11-unix/X$n" ] && timeout 5 xdpyinfo -display ":$n" >/dev/null 2>&1; then
+        if [ ! -S "/tmp/.X11-unix/X$n" ]; then
+            continue
+        fi
+        if timeout 5 xdpyinfo -display ":$n" >/dev/null 2>&1; then
             DISPLAY_NUM=":$n"
             break 2
+        elif [ -z "$XAUTHORITY_PATH" ]; then
+            XWAYLAND_PID="$(xwayland_pid_for_display ":$n" || true)"
+            if [ -n "$XWAYLAND_PID" ]; then
+                XWAYLAND_CMDLINE="$(tr '\0' ' ' < "/proc/$XWAYLAND_PID/cmdline" 2>/dev/null || true)"
+                auth="$(printf '%s' "$XWAYLAND_CMDLINE" | grep -oE '\-auth [^ ]+' | head -n1 | cut -d' ' -f2 || true)"
+                if [ -n "$auth" ] && [ -f "$auth" ] && [ -O "$auth" ]; then
+                    XAUTHORITY_PATH="$auth"
+                    export XAUTHORITY="$XAUTHORITY_PATH"
+                fi
+            fi
         fi
     done
     sleep "$WAIT_INTERVAL"
@@ -126,15 +131,15 @@ if [ -z "$DISPLAY_NUM" ]; then
     echo "X11 sockets:"
     ls -la /tmp/.X11-unix || true
     echo "Xwayland processes:"
-    pgrep -a Xwayland || true
-    fail_with_log "XWayland display not found"
+    pgrep -x Xwayland || true
+    fail_with_log "Xwayland did not start"
 fi
 
 export DISPLAY="$DISPLAY_NUM"
 echo "Using XWayland display $DISPLAY_NUM"
 
 if ! timeout 5 xdpyinfo >/dev/null 2>&1; then
-    fail_with_log "xdpyinfo failed for DISPLAY=$DISPLAY (XAUTHORITY=${XAUTHORITY:-})"
+    fail_with_log "xdpyinfo failed for DISPLAY=$DISPLAY"
 fi
 
 # Persist environment variables for subsequent workflow steps.

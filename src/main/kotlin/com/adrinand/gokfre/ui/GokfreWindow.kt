@@ -33,6 +33,7 @@ import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.awt.Rectangle
 import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
@@ -60,6 +61,7 @@ fun GokfreWindow(
     var composeWindow by remember { mutableStateOf<ComposeWindow?>(null) }
     var previewReady by remember { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf<List<String>>(emptyList()) }
+    var lastWorkArea by remember { mutableStateOf<Rectangle?>(null) }
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -92,7 +94,7 @@ fun GokfreWindow(
         logger.info { "onKeyPressed: selectedKeys=$selectedKeys" }
         if (selectedKeys.size == MAX_SELECTED_KEYS) {
             val win = composeWindow ?: return
-            val workArea = win.workAreaBounds()
+            val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
             val keysToArrange = selectedKeys
             logger.info { "onKeyPressed: arranging then closing preview" }
             coroutineScope.launch {
@@ -116,6 +118,8 @@ fun GokfreWindow(
         undecorated = true,
         transparent = true,
         title = PREVIEW_WINDOW_TITLE,
+        focusable = true,
+        alwaysOnTop = visible,
     ) {
         LaunchedEffect(Unit) {
             logger.info { "GokfreWindow content composed, window=$window, visible=$visible" }
@@ -139,7 +143,6 @@ fun GokfreWindow(
 
             window.setOpacitySafely(0f)
             window.bounds = window.workAreaBounds()
-            window.focusableWindowState = false
         }
 
         Box(
@@ -183,17 +186,13 @@ fun GokfreWindow(
         if (!visible) {
             logger.info { "LaunchedEffect: hiding preview" }
             previewReady = false
-            win.focusableWindowState = false
-            win.isAlwaysOnTop = false
             return@LaunchedEffect
         }
 
         logger.info {
             "LaunchedEffect: showing preview, isVisible=${win.isVisible}, isShowing=${win.isShowing}"
         }
-        win.bounds = win.workAreaBounds()
         win.setOpacitySafely(0f)
-        win.isAlwaysOnTop = true
         var waitedMs = 0L
         while (!win.isShowing && waitedMs < MAX_SHOW_WAIT_MS) {
             delay(SHOW_POLL_INTERVAL_MS.milliseconds)
@@ -202,19 +201,26 @@ fun GokfreWindow(
         if (!win.isShowing) {
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
-        win.focusableWindowState = true
+        val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
+        val sameMonitor = lastWorkArea?.intersects(workArea) ?: false
+        win.isResizable = true
+        arrangementController.windowManager.focusPreview(win)
+        val placed =
+            if (sameMonitor) {
+                arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+            } else {
+                arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+            }
+        lastWorkArea = if (placed) workArea else null
+        win.isResizable = false
         if (!isLinux()) {
             focusAppWindow()
         }
-        win.toFront()
-        win.requestFocus()
-        focusRequester.requestFocus()
         win.setOpacitySafely(1f)
         previewReady = true
-
-        win.isResizable = true
-        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-        win.isResizable = false
+        arrangementController.windowManager.focusPreview(win)
+        runCatching { focusRequester.requestFocus() }
+            .onFailure { logger.warning { "re-request focus failed: $it" } }
     }
 }
 

@@ -132,7 +132,7 @@ fun runGokfreApplication(
 
         GokfreTray(
             icon = trayIcon,
-            onToggle = { isWindowVisible = !isWindowVisible },
+            onToggle = toggleWindow,
             onSettings = { showSettings = true },
         )
 

@@ -13,6 +13,8 @@ internal interface MacWindowSource {
 
     fun windowTitle(pid: Long): String?
 
+    fun windowBounds(pid: Long): Rectangle?
+
     fun setBounds(
         pid: Long,
         bounds: Rectangle,
