@@ -2,6 +2,7 @@ package com.adrinand.gokfre
 
 import java.awt.Rectangle
 import java.awt.Toolkit
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
@@ -10,6 +11,7 @@ private const val DEFAULT_WIDTH = 800
 private const val DEFAULT_HEIGHT = 600
 private const val DEFAULT_X = 100
 private const val DEFAULT_Y = 100
+private const val COMMAND_TIMEOUT_SECONDS = 5L
 
 /**
  * A real Swing window used as the target for arrangement E2E tests.
@@ -24,30 +26,9 @@ class TestTargetWindow(
     y: Int = DEFAULT_Y,
 ) {
     private val frame = JFrame("Gokfre E2E Target")
+    private var x11WindowId: String? = null
 
     init {
-        frame.addComponentListener(
-            object : java.awt.event.ComponentAdapter() {
-                override fun componentResized(event: java.awt.event.ComponentEvent) {
-                    println("[e2e] target resized: ${frame.bounds} source=${event.component.javaClass.name}")
-                }
-
-                override fun componentMoved(event: java.awt.event.ComponentEvent) {
-                    println("[e2e] target moved: ${frame.bounds} source=${event.component.javaClass.name}")
-                }
-            },
-        )
-        frame.addFocusListener(
-            object : java.awt.event.FocusAdapter() {
-                override fun focusGained(event: java.awt.event.FocusEvent) {
-                    println("[e2e] target focus gained: ${frame.bounds} focused=${frame.isFocused}")
-                }
-
-                override fun focusLost(event: java.awt.event.FocusEvent) {
-                    println("[e2e] target focus lost: ${frame.bounds} focused=${frame.isFocused}")
-                }
-            },
-        )
         SwingUtilities.invokeAndWait {
             frame.setSize(width, height)
             frame.setLocation(x, y)
@@ -58,7 +39,17 @@ class TestTargetWindow(
         }
     }
 
+    /**
+     * Frame bounds of the window.
+     *
+     * On X11, AWT can lag behind compositor-initiated resizes (KWin may not
+     * deliver the configure event to the JVM at all), so read the geometry from
+     * the server and add [_NET_FRAME_EXTENTS]. Other platforms use AWT.
+     */
     val bounds: Rectangle
+        get() = x11FrameBounds() ?: awtBounds
+
+    private val awtBounds: Rectangle
         get() {
             val holder = AtomicReference<Rectangle>()
             SwingUtilities.invokeAndWait { holder.set(frame.bounds) }
@@ -104,36 +95,57 @@ class TestTargetWindow(
      * Reports the AWT and X11 views of the window so E2E failures can tell
      * whether the compositor or the AWT event queue is out of sync.
      */
-    fun describeGeometry(): String {
-        val awt = bounds
-
-        fun run(vararg command: String): String =
-            runCatching {
-                val process = ProcessBuilder(*command).redirectErrorStream(true).start()
-                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-                process.inputStream.bufferedReader().readText().trim()
-            }.getOrDefault("failed")
-        val geometries =
-            run("xdotool", "search", "--name", frame.title).lineSequence()
-                .filter { it.isNotBlank() }
-                .joinToString("; ") { id ->
-                    val geometry = run("xdotool", "getwindowgeometry", "--shell", id).replace('\n', ',')
-                    val extents = run("xprop", "-id", id, "_NET_FRAME_EXTENTS").replace('\n', ',')
-                    val info =
-                        run("xwininfo", "-id", id)
-                            .lineSequence()
-                            .filter {
-                                it.contains("Parent window id") || it.contains("Absolute upper-left") ||
-                                    it.startsWith("  Width") || it.startsWith("  Height")
-                            }
-                            .joinToString(",")
-                    "id=$id $geometry extents=[$extents] info=[$info]"
-                }
-        return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} x11=[$geometries] " +
-            "tree=[${run("xwininfo", "-root", "-tree").lineSequence().filter { it.contains(frame.title) }.joinToString("; ")}]"
-    }
+    fun describeGeometry(): String = "awt=$awtBounds x11=${x11FrameBounds() ?: "unavailable"}"
 
     fun close() {
         SwingUtilities.invokeAndWait { frame.dispose() }
+    }
+
+    private fun x11FrameBounds(): Rectangle? =
+        runCatching {
+            val id = x11WindowId ?: findX11WindowId() ?: return@runCatching null
+            val info = runCommand("xwininfo", "-id", id)
+
+            fun value(label: String): Int? =
+                info.lineSequence()
+                    .firstOrNull { it.contains(label) }
+                    ?.substringAfter(':')
+                    ?.trim()
+                    ?.toIntOrNull()
+
+            val x = value("Absolute upper-left X") ?: return@runCatching null
+            val y = value("Absolute upper-left Y") ?: return@runCatching null
+            val width = value("Width") ?: return@runCatching null
+            val height = value("Height") ?: return@runCatching null
+            val (left, right, top, bottom) = frameExtents(id) ?: return@runCatching null
+            Rectangle(x - left, y - top, width + left + right, height + top + bottom)
+        }.getOrNull()
+
+    private fun findX11WindowId(): String? {
+        val ids =
+            runCommand("xdotool", "search", "--name", frame.title)
+                .lineSequence()
+                .filter { it.isNotBlank() }
+                .toList()
+        // Window-manager frame windows can share the title but do not carry
+        // frame extents; the client window does.
+        val client = ids.firstOrNull { frameExtents(it) != null } ?: return null
+        x11WindowId = client
+        return client
+    }
+
+    private fun frameExtents(id: String): List<Int>? {
+        val values =
+            runCommand("xprop", "-id", id, "_NET_FRAME_EXTENTS")
+                .substringAfter('=', "")
+                .split(',')
+                .mapNotNull { it.trim().toIntOrNull() }
+        return values.takeIf { it.size == 4 }
+    }
+
+    private fun runCommand(vararg command: String): String {
+        val process = ProcessBuilder(*command).redirectErrorStream(true).start()
+        process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        return process.inputStream.bufferedReader().readText().trim()
     }
 }
