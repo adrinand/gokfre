@@ -144,10 +144,12 @@ session bus. Design notes live here instead of in code comments.
   `callDBus` (`Report(token, json)`); `KdeScriptRunner` matches replies by token.
   The script is `src/main/resources/kde/gokfre-kde.js`; `KdeScriptRenderer`
   renders it per operation by substituting `__GOKFRE_*__` placeholders. Every
-  script gets a fresh JS context, so the file stays self-contained. CI starts
-  KWin with `--virtual --xwayland` (virtual backend, QPainter compositing), so
-  no GPU or logind session is needed; XWayland only exposes `-displayfd`, so
-  CI finds its display by probing `:0`–`:9`.
+  script gets a fresh JS context, so the file stays self-contained. KWin owns
+  the X11 listening socket and spawns Xwayland lazily on the first X11 client
+  connection, so CI probes `/tmp/.X11-unix/X0`–`X9` with `xdpyinfo` instead of
+  waiting for an `Xwayland` process; CI starts KWin with `--virtual --xwayland`
+  (virtual backend, QPainter compositing), so no GPU or logind session is
+  needed.
 - **KWin compatibility:** Plasma 5 exposes `activeClient`/`clientList`, Plasma 6
   `activeWindow`/`windowList` (support both). Scripts live at `/<id>` on 5.27
   and `/Scripting/Script<id>` on newer builds. `frameGeometry` is read-write;
@@ -190,6 +192,9 @@ session bus. Design notes live here instead of in code comments.
   needs the extension installed; KDE uses KWin scripting and needs nothing
   installed). GNOME disables extensions while the screen is locked, which makes
   the arrangement test fail with a clear message.
+- **GNOME extension version gate:** GNOME Shell silently marks extensions
+  `OUT OF DATE` when `metadata.json` `shell-version` does not list the running
+  major version, so the E2E D-Bus check times out. Add new releases there.
 - **E2E does not cover preview focus:** `E2EUtils.sendKeyToWindow` dispatches
   synthetic AWT events directly to the component, bypassing compositor/AWT focus,
   and `waitForPreviewWindow` only checks `isShowing`. When changing focus logic,
