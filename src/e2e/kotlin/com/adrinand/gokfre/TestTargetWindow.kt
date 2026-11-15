@@ -37,6 +37,17 @@ class TestTargetWindow(
                 }
             },
         )
+        frame.addFocusListener(
+            object : java.awt.event.FocusAdapter() {
+                override fun focusGained(event: java.awt.event.FocusEvent) {
+                    println("[e2e] target focus gained: ${frame.bounds} focused=${frame.isFocused}")
+                }
+
+                override fun focusLost(event: java.awt.event.FocusEvent) {
+                    println("[e2e] target focus lost: ${frame.bounds} focused=${frame.isFocused}")
+                }
+            },
+        )
         SwingUtilities.invokeAndWait {
             frame.setSize(width, height)
             frame.setLocation(x, y)
@@ -106,7 +117,17 @@ class TestTargetWindow(
             run("xdotool", "search", "--name", frame.title).lineSequence()
                 .filter { it.isNotBlank() }
                 .joinToString("; ") { id ->
-                    "id=$id ${run("xdotool", "getwindowgeometry", "--shell", id).replace('\n', ',')}"
+                    val geometry = run("xdotool", "getwindowgeometry", "--shell", id).replace('\n', ',')
+                    val extents = run("xprop", "-id", id, "_NET_FRAME_EXTENTS").replace('\n', ',')
+                    val info =
+                        run("xwininfo", "-id", id)
+                            .lineSequence()
+                            .filter {
+                                it.contains("Parent window id") || it.contains("Absolute upper-left") ||
+                                    it.startsWith("  Width") || it.startsWith("  Height")
+                            }
+                            .joinToString(",")
+                    "id=$id $geometry extents=[$extents] info=[$info]"
                 }
         return "awt=$awt toolkit=${Toolkit.getDefaultToolkit().javaClass.name} x11=[$geometries] " +
             "tree=[${run("xwininfo", "-root", "-tree").lineSequence().filter { it.contains(frame.title) }.joinToString("; ")}]"
