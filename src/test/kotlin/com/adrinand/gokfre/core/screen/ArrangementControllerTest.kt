@@ -6,6 +6,7 @@ import org.junit.Assume.assumeFalse
 import org.junit.Test
 import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
+import java.awt.Window
 
 class ArrangementControllerTest {
     @Test
@@ -91,6 +92,47 @@ class ArrangementControllerTest {
             bounds shouldBe backendWorkArea
             windowManager.lastBounds shouldBe backendWorkArea
         }
+    }
+
+    @Test
+    fun `capture skips the bounds lookup when the backend resolves the work area`() {
+        val workArea = Rectangle(0, 100, 800, 600)
+        val windowManager =
+            object : WindowManager {
+                var boundsLookups = 0
+
+                override fun getActiveWindowId(): WindowHandle = WindowHandle.X11(1)
+
+                override fun getWindowBounds(window: WindowHandle): Rectangle? {
+                    boundsLookups++
+                    return Rectangle(0, 0, 100, 100)
+                }
+
+                override fun getWorkArea(window: WindowHandle): Rectangle? = workArea
+
+                override fun setWindowBounds(
+                    window: WindowHandle,
+                    bounds: Rectangle,
+                ) = Unit
+
+                override fun focusWindow(window: WindowHandle) = Unit
+
+                override suspend fun enterFullscreen(
+                    window: Window,
+                    timeoutMs: Long,
+                ): Boolean = true
+
+                override suspend fun exitFullscreen(
+                    window: Window,
+                    timeoutMs: Long,
+                ): Boolean = true
+            }
+        val controller = ArrangementController(windowManager)
+
+        controller.captureTargetWindow()
+
+        controller.targetWorkArea shouldBe workArea
+        windowManager.boundsLookups shouldBe 0
     }
 
     @Test

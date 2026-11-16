@@ -17,6 +17,7 @@ private const val POLL_TIMEOUT_MS = 2_000L
 /**
  * [WindowManager] implementation for native Wayland windows on KDE Plasma.
  */
+@Suppress("TooManyFunctions")
 class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.KdeWindowManager")
 
@@ -91,6 +92,17 @@ class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
             }
             waitForMaximized(runner, timeoutMs, expected = false)
         }
+
+    override suspend fun preparePreview(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ): Boolean {
+        // A hidden XWayland window is absent from KWin's window list, so place
+        // it after mapping instead of trying to restore it here.
+        window.bounds = bounds
+        return false
+    }
 
     private suspend fun waitForMaximized(
         runner: KdeScriptRunner,

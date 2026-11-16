@@ -30,4 +30,35 @@ class GnomeWindowManagerTest {
     fun `returns null for negative work area dimensions`() {
         parseCapturedWorkArea("(true, 0, 0, -1920, 1048)") shouldBe null
     }
+
+    @Test
+    fun `parses the atomic show preview reply`() {
+        parseShowPreviewResult("(true, true)") shouldBe (true to true)
+        parseShowPreviewResult("(true, false)") shouldBe (true to false)
+        parseShowPreviewResult("(false, false)") shouldBe (false to false)
+    }
+
+    @Test
+    fun `returns null for an unknown show preview reply`() {
+        parseShowPreviewResult("(true)") shouldBe null
+        parseShowPreviewResult("") shouldBe null
+    }
+
+    @Test
+    fun `ignores merged stderr before the show preview reply`() {
+        parseShowPreviewResult("(process:1): GLib-WARNING: something\n(true, false)\n") shouldBe (true to false)
+    }
+
+    @Test
+    fun `detects the pid-aware show preview method`() {
+        val xml = """<method name="ShowPreview"><arg type="i" name="pid" direction="in"/></method>"""
+
+        parseSupportsShowPreview(xml) shouldBe true
+    }
+
+    @Test
+    fun `does not detect an older show preview shape`() {
+        parseSupportsShowPreview("""<method name="PlacePreview"><arg type="i" name="x"/></method>""") shouldBe false
+        parseSupportsShowPreview("""<method name="ShowPreview"><arg type="i" name="x"/></method>""") shouldBe false
+    }
 }

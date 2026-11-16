@@ -159,26 +159,38 @@ session bus. Design notes live here instead of in code comments.
 ### Preview focus and work areas
 
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and
-  Compose focus. Make it focusable before mapping (`Window(focusable = true)`,
-  `alwaysOnTop = visible`), focus it right after `isShowing`, then re-assert
-  focus after placement. Placement/maximize must never gate keyboard focus.
-- On GNOME, `FocusPreview` uses `Main.activateWindow` with a roundtrip timestamp
-  and returns `preview.has_focus()`; the app retries for ~500 ms before falling
-  back to AWT. Shell-side activation is required because `arrange()` just
-  activated the target app, so Mutter's focus-stealing prevention blocks AWT
-  activation; do not call AWT `toFront()`/`requestFocus()` after it.
+  Compose focus. Create the window focusable (`Window(focusable = true)`) but
+  keep it unmapped (`visible = mapped`) until placement has run, then reveal it
+  and re-assert Compose focus. Placement/maximize must never gate keyboard
+  focus.
+- On GNOME, `ShowPreview` places and calls `Main.activateWindow` with a
+  roundtrip timestamp in one D-Bus call, returning `preview.has_focus()`. If
+  focus is not confirmed, the app retries for ~200 ms before falling back to
+  AWT. Shell-side activation is required because `arrange()` just activated the
+  target app, so Mutter's focus-stealing prevention blocks AWT activation; do
+  not call AWT `toFront()`/`requestFocus()` after it.
 - **Coordinate spaces:** AWT/XWayland can report native pixels when JVM UI scaling
   is off (common in E2E), while GNOME and KWin compositor APIs use logical
-  coordinates. `WindowManager.getWorkArea(window, bounds)` must return the
-  backend's own work area; `awtWorkAreaForWindowBounds` is AWT-space only. KDE
-  currently inherits the AWT fallback and needs a backend override on HiDPI.
-- On GNOME, place the preview shell-side (atomic unmaximize + move + maximize);
-  client-side moves of a maximized window race the WM and can leave the preview
-  maximized on the previous monitor. Capture the logical work area in the same
-  `CaptureActiveWindow` call to avoid an extra blocking `gdbus` call. Older
-  extensions without logical work areas use client-side AWT placement instead.
-- Only record the preview's monitor after placement succeeds; a failed move must
-  be retried on the next open.
+  coordinates. `WindowManager.getWorkArea(window)` must return the backend's own
+  work area; `awtWorkAreaForWindowBounds` is AWT-space only. KDE currently
+  inherits the AWT fallback and needs a backend override on HiDPI.
+- On GNOME, the extension can only place the preview once it is mapped, so the
+  app maps it with opacity 0, calls `ShowPreview` (atomic unmaximize + move +
+  maximize + activate), then reveals it. Client-side moves of a maximized window
+  race the WM and can leave the preview maximized on the previous monitor.
+  `CaptureActiveWindow` returns the logical work area; use
+  `WindowManager.getWorkArea(window)` so capture does not spawn a second
+  `GetCapturedWindow` call. Extensions without the pid-aware `ShowPreview` fall
+  back to AWT placement and separate `PlacePreview`/`FocusPreview` calls; a
+  failed atomic call on a new extension is not retried through those title-based
+  methods because they can target a foreign window.
+- On X11 and macOS, `preparePreview` restores and positions the still-hidden
+  window before it is mapped; KDE skips the hidden restore (an unmapped XWayland
+  preview is absent from KWin's window list) and positions it after mapping. The
+  show path verifies the mapped window landed on the target work area before
+  revealing it, and skips the maximize round trip when placement already landed.
+  Never map the preview at its previous bounds or toggle opacity on a visible
+  window: that causes a cross-monitor flash or a show/hide blink.
 - **Extension reloads:** GNOME Shell 45+ caches `extension.js`; disabling/enabling
   or `ReloadExtension` does not reload it. Log out/in after changing the GNOME
   extension before testing new D-Bus methods. Older extensions may lack

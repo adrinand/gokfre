@@ -7,7 +7,16 @@ import java.awt.Window
  * Abstraction over the OS windowing layer used to read the active/focused window
  * and change its bounds.
  */
+@Suppress("ComplexInterface", "TooManyFunctions")
 interface WindowManager {
+    /**
+     * `true` when the compositor can only move the preview after it is mapped.
+     *
+     * GNOME's extension finds the preview in the window actor list, so the app
+     * maps it first and asks the backend to place it.
+     */
+    val previewRequiresMappedWindow: Boolean get() = false
+
     /**
      * Returns a platform-specific handle for the currently active window,
      * or `null` if it cannot be determined.
@@ -26,11 +35,11 @@ interface WindowManager {
     /**
      * Returns the work area of the monitor hosting [window] in the backend's
      * coordinate space, or `null` when it cannot be resolved.
+     *
+     * Backends that already know the work area can override this to avoid the
+     * extra window-bounds lookup.
      */
-    fun getWorkArea(
-        window: WindowHandle,
-        bounds: Rectangle?,
-    ): Rectangle? = bounds?.let(::awtWorkAreaForWindowBounds)
+    fun getWorkArea(window: WindowHandle): Rectangle? = getWindowBounds(window)?.let(::awtWorkAreaForWindowBounds)
 
     /**
      * Moves and resizes [window] to [bounds] in screen coordinates.
@@ -66,6 +75,22 @@ interface WindowManager {
     ): Boolean
 
     /**
+     * Positions the preview while it is still hidden.
+     *
+     * Returns `true` when the window was already restored and [bounds] could be
+     * applied, so the post-map placement can be skipped.
+     */
+    suspend fun preparePreview(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ): Boolean {
+        val restored = exitFullscreen(window, timeoutMs)
+        window.bounds = bounds
+        return restored
+    }
+
+    /**
      * Moves the Gokfre preview [window] to [bounds] and makes it fullscreen.
      *
      * Backends may override this to perform the restore/move/maximize sequence
@@ -84,6 +109,22 @@ interface WindowManager {
         }
         window.bounds = bounds
         return enterFullscreen(window, timeoutMs)
+    }
+
+    /**
+     * Places an already-mapped preview and focuses it.
+     *
+     * Backends may override this to place and focus in a single compositor
+     * round trip (the GNOME extension does).
+     */
+    suspend fun showPreview(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ): Boolean {
+        val placed = placePreview(window, bounds, timeoutMs)
+        focusPreview(window)
+        return placed
     }
 
     /**

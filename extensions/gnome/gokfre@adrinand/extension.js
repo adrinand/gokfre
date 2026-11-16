@@ -41,6 +41,15 @@ const DBUS_INTERFACE = `
       <arg type="i" direction="in" name="height"/>
       <arg type="b" direction="out" name="success"/>
     </method>
+    <method name="ShowPreview">
+      <arg type="i" direction="in" name="x"/>
+      <arg type="i" direction="in" name="y"/>
+      <arg type="i" direction="in" name="width"/>
+      <arg type="i" direction="in" name="height"/>
+      <arg type="i" direction="in" name="pid"/>
+      <arg type="b" direction="out" name="placed"/>
+      <arg type="b" direction="out" name="focused"/>
+    </method>
     <method name="FocusPreview">
       <arg type="b" direction="out" name="success"/>
     </method>
@@ -89,6 +98,31 @@ function findPreviewWindow() {
     return global.get_window_actors()
         .map(actor => actor.metaWindow)
         .find(window => window.title === PREVIEW_TITLE);
+}
+
+function isPreviewOwnedBy(window, ownerPid) {
+    if (typeof window.get_pid !== 'function') {
+        return true;
+    }
+    const windowPid = window.get_pid();
+    return windowPid <= 0 || windowPid === ownerPid;
+}
+
+function isPreviewBoundsOnScreen(x, y, width, height) {
+    if (width <= 0 || height <= 0) {
+        return false;
+    }
+    for (let monitor = 0; monitor < global.display.get_n_monitors(); monitor++) {
+        const geometry = global.display.get_monitor_geometry(monitor);
+        const left = Math.max(x, geometry.x);
+        const top = Math.max(y, geometry.y);
+        const right = Math.min(x + width, geometry.x + geometry.width);
+        const bottom = Math.min(y + height, geometry.y + geometry.height);
+        if (right > left && bottom > top) {
+            return true;
+        }
+    }
+    return false;
 }
 
 class GokfreDBus {
@@ -164,7 +198,7 @@ class GokfreDBus {
 
     PlacePreview(x, y, width, height) {
         const preview = findPreviewWindow();
-        if (!preview) {
+        if (!preview || !isPreviewBoundsOnScreen(x, y, width, height)) {
             return [false];
         }
         try {
@@ -177,6 +211,30 @@ class GokfreDBus {
         } catch (e) {
             console.error('[gokfre] PlacePreview error: ' + e);
             return [false];
+        }
+    }
+
+    ShowPreview(x, y, width, height, pid) {
+        const preview = findPreviewWindow();
+        if (
+            !preview ||
+            !isPreviewOwnedBy(preview, pid) ||
+            !isPreviewBoundsOnScreen(x, y, width, height)
+        ) {
+            return [false, false];
+        }
+        try {
+            if (getMaximizeFlags(preview) !== 0) {
+                setMaximized(preview, false);
+            }
+            preview.move_resize_frame(true, x, y, width, height);
+            setMaximized(preview, true);
+            const time = global.display.get_current_time_roundtrip();
+            Main.activateWindow(preview, time);
+            return [true, preview.has_focus()];
+        } catch (e) {
+            console.error('[gokfre] ShowPreview error: ' + e);
+            return [false, false];
         }
     }
 

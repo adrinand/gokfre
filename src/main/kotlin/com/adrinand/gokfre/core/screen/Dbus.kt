@@ -6,6 +6,9 @@ import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
 
 private const val PROCESS_TIMEOUT_MILLISECONDS = 2_000L
+private const val OUTPUT_READER_JOIN_MILLISECONDS = 500L
+private const val OUTPUT_BUFFER_CHARS = 1024
+private const val MAX_OUTPUT_CHARS = 64 * 1024
 private const val GDBUS_NAME = "gdbus"
 private const val QDBUS_NAME = "qdbus"
 private const val GDBUS_PATH = "/usr/bin/gdbus"
@@ -63,32 +66,87 @@ object Dbus {
     /**
      * Runs [command] and returns its stdout, or `null` on failure.
      *
-     * The output is returned as-is; callers can trim it if needed.
+     * The output is read on a separate thread so [timeoutMs] also bounds a
+     * child that never closes its stdout.
      */
     private fun runCommand(
         command: List<String>,
         timeoutMs: Long = PROCESS_TIMEOUT_MILLISECONDS,
     ): String? {
-        return try {
-            val process =
-                ProcessBuilder(command)
-                    .redirectErrorStream(true)
-                    .start()
-            val output = process.inputStream.bufferedReader().readText()
-            val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-            if (!finished || process.exitValue() != 0) {
+        val process = startProcess(command) ?: return null
+        val output = StringBuilder()
+        val reader = startOutputReader(process, command, output)
+        val finished = waitForProcess(process, command, timeoutMs) ?: return null
+        if (!finished) {
+            process.destroyForcibly()
+        }
+        val readerFinished = joinReader(reader)
+        val processSucceeded = finished && readerFinished
+        val success = processSucceeded && runCatching { process.exitValue() }.getOrDefault(-1) == 0
+        return if (success) {
+            output.toString()
+        } else {
+            if (readerFinished) {
                 logger.fine { "${command.joinToString(" ")} failed: $output" }
-                null
             } else {
-                output
+                logger.fine { "${command.joinToString(" ")} failed: output reader still running" }
             }
-        } catch (e: IOException) {
-            logger.fine { "${command.joinToString(" ")} threw: ${e.message}" }
-            null
-        } catch (e: InterruptedException) {
-            Thread.currentThread().interrupt()
-            logger.fine { "${command.joinToString(" ")} interrupted" }
             null
         }
     }
+
+    private fun startProcess(command: List<String>): Process? =
+        try {
+            ProcessBuilder(command).redirectErrorStream(true).start()
+        } catch (e: IOException) {
+            logger.fine { "${command.joinToString(" ")} threw: ${e.message}" }
+            null
+        }
+
+    private fun startOutputReader(
+        process: Process,
+        command: List<String>,
+        output: StringBuilder,
+    ): Thread =
+        Thread {
+            runCatching {
+                process.inputStream.bufferedReader().use { stream ->
+                    val buffer = CharArray(OUTPUT_BUFFER_CHARS)
+                    while (true) {
+                        val read = stream.read(buffer)
+                        if (read < 0) break
+                        val remaining = MAX_OUTPUT_CHARS - output.length
+                        if (remaining > 0) {
+                            output.append(buffer, 0, minOf(read, remaining))
+                        }
+                    }
+                }
+            }.onFailure { logger.fine { "Reading ${command.joinToString(" ")} output failed: ${it.message}" } }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+
+    private fun waitForProcess(
+        process: Process,
+        command: List<String>,
+        timeoutMs: Long,
+    ): Boolean? =
+        try {
+            process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            process.destroyForcibly()
+            logger.fine { "${command.joinToString(" ")} interrupted" }
+            null
+        }
+
+    private fun joinReader(reader: Thread): Boolean =
+        try {
+            reader.join(OUTPUT_READER_JOIN_MILLISECONDS)
+            !reader.isAlive
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
 }

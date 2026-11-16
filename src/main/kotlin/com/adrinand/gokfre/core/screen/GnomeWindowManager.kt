@@ -20,7 +20,8 @@ private const val POLL_INTERVAL_MS = 50L
 private const val MAXIMIZE_SETTLE_MS = 50L
 private const val CALL_TIMEOUT_MS = 300L
 private const val FOCUS_CALL_TIMEOUT_MS = 1_000L
-private const val FOCUS_RETRY_TIMEOUT_MS = 500L
+private const val SHOW_PREVIEW_TIMEOUT_MS = 1_000L
+private const val FOCUS_RETRY_TIMEOUT_MS = 200L
 private const val PLACE_PREVIEW_ATTEMPTS = 5
 private const val BOUNDS_VALUE_COUNT = 4
 private const val X_INDEX = 0
@@ -39,6 +40,21 @@ private val CAPTURED_WORK_AREA_REGEX =
         """\(\s*true\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,""" +
             """\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*$""",
     )
+private val SHOW_PREVIEW_RESULT_REGEX = Regex("""\(\s*(true|false)\s*,\s*(true|false)\s*\)""")
+private val SHOW_PREVIEW_METHOD_REGEX =
+    Regex("""<method name="ShowPreview">(.*?)</method>""", RegexOption.DOT_MATCHES_ALL)
+
+internal fun parseSupportsShowPreview(introspection: String): Boolean {
+    val method = SHOW_PREVIEW_METHOD_REGEX.find(introspection)?.groupValues?.get(1) ?: return false
+    return method.contains("name=\"pid\"")
+}
+
+internal fun parseShowPreviewResult(output: String): Pair<Boolean, Boolean>? {
+    val match = SHOW_PREVIEW_RESULT_REGEX.findAll(output).lastOrNull()
+    val placed = match?.groupValues?.get(1)?.toBooleanStrictOrNull()
+    val focused = match?.groupValues?.get(2)?.toBooleanStrictOrNull()
+    return if (placed != null && focused != null) placed to focused else null
+}
 
 internal fun parseCapturedWorkArea(output: String): Rectangle? {
     val values =
@@ -70,6 +86,13 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     @Volatile
     private var capturedWorkArea: Rectangle? = null
 
+    @Volatile
+    private var supportsShowPreview: Boolean? = null
+
+    private val selfPid: Int = ProcessHandle.current().pid().toInt()
+
+    override val previewRequiresMappedWindow: Boolean = true
+
     /**
      * Returns `true` if the companion GNOME Shell extension is available on
      * the session bus and a D-Bus client is installed.
@@ -79,9 +102,10 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         val output =
             runDbusClient(
                 client,
-                listOf("introspect", "--session", "--dest", SERVICE_NAME, "--object-path", OBJECT_PATH),
-            )
-        return output != null
+                listOf("introspect", "--session", "--dest", SERVICE_NAME, "--object-path", OBJECT_PATH, "--xml"),
+            ) ?: return false
+        supportsShowPreview = parseSupportsShowPreview(output)
+        return true
     }
 
     override fun castHandle(window: WindowHandle): WindowHandle.Wayland? =
@@ -106,12 +130,13 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     }
 
     /**
-     * Returns the work area in the extension's logical coordinate space.
+     * Uses the work area captured by `CaptureActiveWindow`, avoiding a separate
+     * `GetCapturedWindow` D-Bus call.
      */
-    override fun getWorkArea(
-        window: WindowHandle,
-        bounds: Rectangle?,
-    ): Rectangle? = castHandle(window)?.let { capturedWorkArea } ?: super.getWorkArea(window, bounds)
+    override fun getWorkArea(window: WindowHandle): Rectangle? {
+        val handle = castHandle(window) ?: return super.getWorkArea(window)
+        return capturedWorkArea ?: super.getWorkArea(handle)
+    }
 
     override fun applyBounds(
         handle: WindowHandle.Wayland,
@@ -195,6 +220,73 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
             logger.warning { "GNOME extension could not place the preview; keeping its current bounds" }
         }
         return placed
+    }
+
+    override suspend fun showPreview(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ): Boolean {
+        if (capturedWorkArea == null || supportsShowPreview != true) {
+            return super.showPreview(window, bounds, timeoutMs)
+        }
+        val placed = showAtomically(window, bounds, timeoutMs)
+        if (!placed) {
+            // Do not fall back to the title-only placement/focus methods: they
+            // can target a foreign window that reuses the preview title.
+            super.focusPreview(window)
+        }
+        return placed
+    }
+
+    private suspend fun showAtomically(
+        window: Window,
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ): Boolean {
+        val atomic = withContext(Dispatchers.IO) { callAtomicShowPreview(bounds, timeoutMs) }
+        if (atomic == null) {
+            logger.warning { "ShowPreview failed" }
+            return false
+        }
+        if (!atomic.first) {
+            logger.warning { "GNOME extension did not find the owned preview" }
+            return false
+        }
+        if (!atomic.second) {
+            focusPreview(window)
+        }
+        return true
+    }
+
+    private suspend fun callAtomicShowPreview(
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ): Pair<Boolean, Boolean>? {
+        val callTimeout = timeoutMs.coerceAtMost(SHOW_PREVIEW_TIMEOUT_MS)
+        var lastResult: Pair<Boolean, Boolean>? = null
+        repeat(PLACE_PREVIEW_ATTEMPTS) { attempt ->
+            val result =
+                callMethod(
+                    "ShowPreview",
+                    listOf(
+                        bounds.x.toString(),
+                        bounds.y.toString(),
+                        bounds.width.toString(),
+                        bounds.height.toString(),
+                        selfPid.toString(),
+                    ),
+                    timeoutMs = callTimeout,
+                )?.let(::parseShowPreviewResult) ?: return null
+            lastResult = result
+            if (result.first) {
+                return result
+            }
+            if (attempt < PLACE_PREVIEW_ATTEMPTS - 1) {
+                delay(POLL_INTERVAL_MS.milliseconds)
+            }
+        }
+        return lastResult
     }
 
     override suspend fun focusPreview(window: Window) {
