@@ -180,10 +180,11 @@ session bus. Design notes live here instead of in code comments.
   preview is mapped. `ShowPreview` only activates when the preview is already
   maximized on the target monitor; otherwise it restores, moves and maximizes.
   If the atomic call cannot place the preview, the app hides it instead of
-  revealing an unplaced window. Focus retries use the pid-guarded
-  `FocusPreviewForPid`. Never toggle `isResizable` on the preview: fixed-size
-  hints can undo the shell-side maximize. Client-side moves of a maximized
-  window also race the WM and can leave the preview on the previous monitor.
+  revealing an unplaced window; the legacy extension fallback reveals with AWT
+  focus instead. Focus retries use the pid-guarded `FocusPreviewForPid`.
+  Never toggle `isResizable` on the preview: fixed-size hints can undo the
+  shell-side maximize. Client-side moves of a maximized window also race the WM
+  and can leave the preview on the previous monitor.
   `CaptureActiveWindow` returns the logical work area; use
   `WindowManager.getWorkArea(window)` so capture does not spawn a second
   `GetCapturedWindow` call. Extensions without the newer atomic preview methods

@@ -220,11 +220,10 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 false
             }
         if (!placed) {
-            // [bounds] is logical while AWT is in XWayland pixels; writing it
-            // client-side would move the preview to the wrong place.
-            logger.warning { "GNOME extension could not place the preview; keeping its current bounds" }
+            logger.warning { "GNOME extension could not place the preview; maximizing in place" }
+            return enterFullscreen(window, timeoutMs)
         }
-        return placed
+        return true
     }
 
     override suspend fun showPreview(
@@ -234,7 +233,11 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     ): Boolean {
         if (capturedWorkArea == null || supportsShowPreview != true) {
             awaitMapped(window)
-            return super.showPreview(window, bounds, timeoutMs)
+            val placed = super.showPreview(window, bounds, timeoutMs)
+            if (!placed) {
+                logger.warning { "GNOME extension could not place the preview; revealing with AWT focus" }
+            }
+            return true
         }
         if (showAtomically(window, bounds, timeoutMs)) {
             return true
