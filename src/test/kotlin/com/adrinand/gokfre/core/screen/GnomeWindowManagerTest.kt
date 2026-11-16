@@ -4,6 +4,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.Test
 import java.awt.Rectangle
 
+@Suppress("TooManyFunctions")
 class GnomeWindowManagerTest {
     @Test
     fun `parses the logical work area reported by the extension`() {
@@ -51,9 +52,18 @@ class GnomeWindowManagerTest {
 
     @Test
     fun `detects the pid-aware show preview method`() {
-        val xml = """<method name="ShowPreview"><arg type="i" name="pid" direction="in"/></method>"""
+        val xml =
+            """<method name="ShowPreview"><arg type="i" name="pid" direction="in"/></method>""" +
+                """<method name="PlacePreviewForPid"/><method name="FocusPreviewForPid"/>"""
 
         parseSupportsShowPreview(xml) shouldBe true
+    }
+
+    @Test
+    fun `does not detect an intermediate show preview without the pid fallbacks`() {
+        val xml = """<method name="ShowPreview"><arg type="i" name="pid" direction="in"/></method>"""
+
+        parseSupportsShowPreview(xml) shouldBe false
     }
 
     @Test

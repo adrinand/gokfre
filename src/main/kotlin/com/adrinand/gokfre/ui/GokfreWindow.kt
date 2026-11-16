@@ -32,8 +32,10 @@ import com.adrinand.gokfre.core.screen.skipTaskbarX11
 import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
@@ -45,12 +47,14 @@ private val logger = Logger.getLogger("com.adrinand.gokfre.ui.GokfreWindow")
 const val PREVIEW_WINDOW_TITLE = "Gokfre Preview"
 
 private const val SHOW_POLL_INTERVAL_MS = 10L
+private const val MAP_WATCH_INTERVAL_MS = 5L
 private const val MAX_SHOW_WAIT_MS = 500L
 private const val PREPARE_WAIT_TIMEOUT_MS = 500L
 private const val FULLSCREEN_WAIT_TIMEOUT_MS = 2_000L
-private const val FADE_IN_MS = 100
+private const val FADE_IN_MS = 50
 private const val FADE_OUT_MS = 60
 private const val MAX_SELECTED_KEYS = 2
+private const val NANOS_PER_MILLISECOND = 1_000_000L
 
 @Suppress("TooGenericExceptionCaught")
 @Composable
@@ -174,7 +178,9 @@ fun GokfreWindow(
                     }
                     .focusable(),
         ) {
-            LayoutPreviewScreen(viewModel, selectedKeys = selectedKeys.toSet())
+            if (previewReady) {
+                LayoutPreviewScreen(viewModel, selectedKeys = selectedKeys.toSet())
+            }
         }
     }
 
@@ -193,29 +199,61 @@ fun GokfreWindow(
             return@LaunchedEffect
         }
 
+        val showStartedAt = System.nanoTime()
         logger.info {
             "LaunchedEffect: showing preview, isVisible=${win.isVisible}, isShowing=${win.isShowing}"
         }
         win.setOpacitySafely(0f)
         val manager = arrangementController.windowManager
-        val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
-        win.isResizable = true
         try {
-            val prepared =
-                if (manager.previewRequiresMappedWindow) {
-                    false
-                } else {
-                    runCatching { manager.preparePreview(win, workArea, PREPARE_WAIT_TIMEOUT_MS) }
-                        .onFailure { logger.warning { "Could not prepare preview: $it" } }
-                        .getOrDefault(false)
-                }
-
-            mapped = true
-            awaitShowing(win)
-
             if (manager.previewRequiresMappedWindow) {
-                manager.showPreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+                // Capture before mapping so the preview never becomes the target.
+                captureTarget(arrangementController)
+                val capturedAt = elapsedMs(showStartedAt)
+                val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
+                var mappedAt = -1L
+                val mapWatcher =
+                    launch {
+                        while (!win.isShowing) {
+                            delay(MAP_WATCH_INTERVAL_MS)
+                        }
+                        mappedAt = elapsedMs(showStartedAt)
+                        logger.info { "Preview show: mapped=${mappedAt}ms" }
+                    }
+                mapped = true
+                val placed =
+                    try {
+                        manager.showPreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+                    } finally {
+                        mapWatcher.cancel()
+                    }
+                logger.info {
+                    "Preview show: captured=${capturedAt}ms, mapped=${mappedAt}ms, " +
+                        "placed=${elapsedMs(showStartedAt)}ms, result=$placed"
+                }
+                if (!placed) {
+                    logger.warning { "Could not place the preview; hiding it" }
+                    win.setOpacitySafely(0f)
+                    mapped = false
+                    onClose()
+                    return@LaunchedEffect
+                }
             } else {
+                captureTarget(arrangementController)
+                val capturedAt = elapsedMs(showStartedAt)
+                val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
+                val prepared =
+                    try {
+                        manager.preparePreview(win, workArea, PREPARE_WAIT_TIMEOUT_MS)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        logger.warning { "Could not prepare preview: $e" }
+                        false
+                    }
+                mapped = true
+                awaitShowing(win)
+                val mappedAt = elapsedMs(showStartedAt)
                 val onTarget =
                     runCatching { win.workAreaBounds().intersects(workArea) }.getOrDefault(false)
                 if (!prepared || !onTarget) {
@@ -225,21 +263,37 @@ fun GokfreWindow(
                     focusAppWindow()
                 }
                 manager.focusPreview(win)
+                logger.info {
+                    "Preview show: captured=${capturedAt}ms, mapped=${mappedAt}ms, " +
+                        "placed=${elapsedMs(showStartedAt)}ms"
+                }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             logger.warning { "Preview placement failed: $e" }
-        } finally {
-            win.isResizable = false
         }
 
         win.setOpacitySafely(1f)
         previewReady = true
+        logger.info { "Preview show: revealed=${elapsedMs(showStartedAt)}ms" }
         runCatching { focusRequester.requestFocus() }
             .onFailure { logger.warning { "re-request focus failed: $it" } }
     }
 }
+
+@Suppress("TooGenericExceptionCaught")
+private suspend fun captureTarget(controller: ArrangementController) {
+    try {
+        withContext(Dispatchers.IO) { controller.captureTargetWindow() }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        logger.warning { "Could not capture the target window: $e" }
+    }
+}
+
+private fun elapsedMs(startedAt: Long): Long = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND
 
 private suspend fun awaitShowing(win: Window) {
     var waitedMs = 0L

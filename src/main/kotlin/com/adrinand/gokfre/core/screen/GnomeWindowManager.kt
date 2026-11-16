@@ -22,7 +22,9 @@ private const val CALL_TIMEOUT_MS = 300L
 private const val FOCUS_CALL_TIMEOUT_MS = 1_000L
 private const val SHOW_PREVIEW_TIMEOUT_MS = 1_000L
 private const val FOCUS_RETRY_TIMEOUT_MS = 200L
-private const val PLACE_PREVIEW_ATTEMPTS = 5
+private const val SHOW_WAIT_TIMEOUT_MS = 500L
+private const val SHOW_WAIT_POLL_MS = 10L
+private const val PLACE_PREVIEW_ATTEMPTS = 10
 private const val BOUNDS_VALUE_COUNT = 4
 private const val X_INDEX = 0
 private const val Y_INDEX = 1
@@ -46,7 +48,9 @@ private val SHOW_PREVIEW_METHOD_REGEX =
 
 internal fun parseSupportsShowPreview(introspection: String): Boolean {
     val method = SHOW_PREVIEW_METHOD_REGEX.find(introspection)?.groupValues?.get(1) ?: return false
-    return method.contains("name=\"pid\"")
+    return method.contains("name=\"pid\"") &&
+        introspection.contains("<method name=\"PlacePreviewForPid\"") &&
+        introspection.contains("<method name=\"FocusPreviewForPid\"")
 }
 
 internal fun parseShowPreviewResult(output: String): Pair<Boolean, Boolean>? {
@@ -105,6 +109,7 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 listOf("introspect", "--session", "--dest", SERVICE_NAME, "--object-path", OBJECT_PATH, "--xml"),
             ) ?: return false
         supportsShowPreview = parseSupportsShowPreview(output)
+        logger.info { "GNOME extension atomic ShowPreview supported=$supportsShowPreview" }
         return true
     }
 
@@ -228,16 +233,59 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         timeoutMs: Long,
     ): Boolean {
         if (capturedWorkArea == null || supportsShowPreview != true) {
+            awaitMapped(window)
             return super.showPreview(window, bounds, timeoutMs)
         }
-        val placed = showAtomically(window, bounds, timeoutMs)
-        if (!placed) {
-            // Do not fall back to the title-only placement/focus methods: they
-            // can target a foreign window that reuses the preview title.
-            super.focusPreview(window)
+        if (showAtomically(window, bounds, timeoutMs)) {
+            return true
+        }
+        logger.warning { "ShowPreview failed; retrying with pid-guarded placement" }
+        awaitMapped(window)
+        val placed = placePreviewForPid(bounds, timeoutMs)
+        if (placed) {
+            focusPreviewForPid(window)
         }
         return placed
     }
+
+    private suspend fun awaitMapped(window: Window) {
+        val deadline = TimeSource.Monotonic.markNow() + SHOW_WAIT_TIMEOUT_MS.milliseconds
+        while (!window.isShowing && deadline.hasNotPassedNow()) {
+            delay(SHOW_WAIT_POLL_MS.milliseconds)
+        }
+        if (!window.isShowing) {
+            logger.warning { "Preview window did not report isShowing before placement" }
+        }
+    }
+
+    private suspend fun placePreviewForPid(
+        bounds: Rectangle,
+        timeoutMs: Long,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            val callTimeout = timeoutMs.coerceAtMost(SHOW_PREVIEW_TIMEOUT_MS)
+            repeat(PLACE_PREVIEW_ATTEMPTS) { attempt ->
+                val output =
+                    callMethod(
+                        "PlacePreviewForPid",
+                        listOf(
+                            bounds.x.toString(),
+                            bounds.y.toString(),
+                            bounds.width.toString(),
+                            bounds.height.toString(),
+                            selfPid.toString(),
+                        ),
+                        timeoutMs = callTimeout,
+                    )
+                if (output != null && parseLeadingBoolean(output.trim()) == true) {
+                    return@withContext true
+                }
+                if (attempt < PLACE_PREVIEW_ATTEMPTS - 1) {
+                    delay(POLL_INTERVAL_MS.milliseconds)
+                }
+            }
+            false
+        }
 
     private suspend fun showAtomically(
         window: Window,
@@ -254,7 +302,7 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
             return false
         }
         if (!atomic.second) {
-            focusPreview(window)
+            focusPreviewForPid(window)
         }
         return true
     }
@@ -290,23 +338,34 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     }
 
     override suspend fun focusPreview(window: Window) {
-        val focused =
-            withContext(Dispatchers.IO) {
-                val deadline = TimeSource.Monotonic.markNow() + FOCUS_RETRY_TIMEOUT_MS.milliseconds
-                while (deadline.hasNotPassedNow()) {
-                    val output = callMethod("FocusPreview", timeoutMs = FOCUS_CALL_TIMEOUT_MS)
-                    if (output != null && parseLeadingBoolean(output.trim()) == true) {
-                        return@withContext true
-                    }
-                    delay(POLL_INTERVAL_MS.milliseconds)
-                }
-                false
-            }
-        if (!focused) {
+        if (!awaitFocus("FocusPreview")) {
             logger.info { "GNOME extension did not confirm preview focus; using AWT activation" }
             super.focusPreview(window)
         }
     }
+
+    private suspend fun focusPreviewForPid(window: Window) {
+        if (!awaitFocus("FocusPreviewForPid", listOf(selfPid.toString()))) {
+            logger.info { "GNOME extension did not confirm preview focus; using AWT activation" }
+            super.focusPreview(window)
+        }
+    }
+
+    private suspend fun awaitFocus(
+        method: String,
+        args: List<String> = emptyList(),
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            val deadline = TimeSource.Monotonic.markNow() + FOCUS_RETRY_TIMEOUT_MS.milliseconds
+            while (deadline.hasNotPassedNow()) {
+                val output = callMethod(method, args, timeoutMs = FOCUS_CALL_TIMEOUT_MS)
+                if (output != null && parseLeadingBoolean(output.trim()) == true) {
+                    return@withContext true
+                }
+                delay(POLL_INTERVAL_MS.milliseconds)
+            }
+            false
+        }
 
     private suspend fun waitForMaximized(
         timeoutMs: Long,

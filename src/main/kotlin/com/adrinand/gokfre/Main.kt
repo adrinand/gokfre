@@ -101,11 +101,7 @@ fun runGokfreApplication(
         }
 
         val toggleWindow = {
-            val controller = arrangementController
-            if (controller != null) {
-                if (!isWindowVisible) {
-                    controller.captureTargetWindow()
-                }
+            if (arrangementController != null) {
                 isWindowVisible = !isWindowVisible
                 logger.info("Preview window visible=$isWindowVisible")
             } else {

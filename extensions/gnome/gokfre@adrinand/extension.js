@@ -41,6 +41,14 @@ const DBUS_INTERFACE = `
       <arg type="i" direction="in" name="height"/>
       <arg type="b" direction="out" name="success"/>
     </method>
+    <method name="PlacePreviewForPid">
+      <arg type="i" direction="in" name="x"/>
+      <arg type="i" direction="in" name="y"/>
+      <arg type="i" direction="in" name="width"/>
+      <arg type="i" direction="in" name="height"/>
+      <arg type="i" direction="in" name="pid"/>
+      <arg type="b" direction="out" name="success"/>
+    </method>
     <method name="ShowPreview">
       <arg type="i" direction="in" name="x"/>
       <arg type="i" direction="in" name="y"/>
@@ -51,6 +59,10 @@ const DBUS_INTERFACE = `
       <arg type="b" direction="out" name="focused"/>
     </method>
     <method name="FocusPreview">
+      <arg type="b" direction="out" name="success"/>
+    </method>
+    <method name="FocusPreviewForPid">
+      <arg type="i" direction="in" name="pid"/>
       <arg type="b" direction="out" name="success"/>
     </method>
     <method name="RestorePreview">
@@ -98,6 +110,33 @@ function findPreviewWindow() {
     return global.get_window_actors()
         .map(actor => actor.metaWindow)
         .find(window => window.title === PREVIEW_TITLE);
+}
+
+function isWindowMapped(window) {
+    if (typeof window.is_mapped === 'function') {
+        return window.is_mapped();
+    }
+    if (typeof window.mapped === 'boolean') {
+        return window.mapped;
+    }
+    return true;
+}
+
+function monitorIndexForRect(x, y, width, height) {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    for (let monitor = 0; monitor < global.display.get_n_monitors(); monitor++) {
+        const geometry = global.display.get_monitor_geometry(monitor);
+        if (
+            centerX >= geometry.x &&
+            centerX < geometry.x + geometry.width &&
+            centerY >= geometry.y &&
+            centerY < geometry.y + geometry.height
+        ) {
+            return monitor;
+        }
+    }
+    return -1;
 }
 
 function isPreviewOwnedBy(window, ownerPid) {
@@ -198,7 +237,7 @@ class GokfreDBus {
 
     PlacePreview(x, y, width, height) {
         const preview = findPreviewWindow();
-        if (!preview || !isPreviewBoundsOnScreen(x, y, width, height)) {
+        if (!preview || !isWindowMapped(preview) || !isPreviewBoundsOnScreen(x, y, width, height)) {
             return [false];
         }
         try {
@@ -214,16 +253,47 @@ class GokfreDBus {
         }
     }
 
+    PlacePreviewForPid(x, y, width, height, pid) {
+        const preview = findPreviewWindow();
+        if (
+            !preview ||
+            !isWindowMapped(preview) ||
+            !isPreviewOwnedBy(preview, pid) ||
+            !isPreviewBoundsOnScreen(x, y, width, height)
+        ) {
+            return [false];
+        }
+        try {
+            if (getMaximizeFlags(preview) !== 0) {
+                setMaximized(preview, false);
+            }
+            preview.move_resize_frame(true, x, y, width, height);
+            setMaximized(preview, true);
+            return [true];
+        } catch (e) {
+            console.error('[gokfre] PlacePreviewForPid error: ' + e);
+            return [false];
+        }
+    }
+
     ShowPreview(x, y, width, height, pid) {
         const preview = findPreviewWindow();
         if (
             !preview ||
+            !isWindowMapped(preview) ||
             !isPreviewOwnedBy(preview, pid) ||
             !isPreviewBoundsOnScreen(x, y, width, height)
         ) {
             return [false, false];
         }
         try {
+            const targetMonitor = monitorIndexForRect(x, y, width, height);
+            const maximized = getMaximizeFlags(preview) === Meta.MaximizeFlags.BOTH;
+            if (preview.get_monitor() === targetMonitor && maximized) {
+                const time = global.display.get_current_time_roundtrip();
+                Main.activateWindow(preview, time);
+                return [true, preview.has_focus()];
+            }
             if (getMaximizeFlags(preview) !== 0) {
                 setMaximized(preview, false);
             }
@@ -249,6 +319,21 @@ class GokfreDBus {
             return [preview.has_focus()];
         } catch (e) {
             console.error('[gokfre] FocusPreview error: ' + e);
+            return [false];
+        }
+    }
+
+    FocusPreviewForPid(pid) {
+        const preview = findPreviewWindow();
+        if (!preview || !isWindowMapped(preview) || !isPreviewOwnedBy(preview, pid)) {
+            return [false];
+        }
+        try {
+            const time = global.display.get_current_time_roundtrip();
+            Main.activateWindow(preview, time);
+            return [preview.has_focus()];
+        } catch (e) {
+            console.error('[gokfre] FocusPreviewForPid error: ' + e);
             return [false];
         }
     }

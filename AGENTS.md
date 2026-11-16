@@ -159,10 +159,9 @@ session bus. Design notes live here instead of in code comments.
 ### Preview focus and work areas
 
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and
-  Compose focus. Create the window focusable (`Window(focusable = true)`) but
-  keep it unmapped (`visible = mapped`) until placement has run, then reveal it
-  and re-assert Compose focus. Placement/maximize must never gate keyboard
-  focus.
+  Compose focus. The window stays hidden while the target is captured, then maps
+  and is placed before reveal; re-assert Compose focus on reveal. Placement and
+  maximize must never gate keyboard focus.
 - On GNOME, `ShowPreview` places and calls `Main.activateWindow` with a
   roundtrip timestamp in one D-Bus call, returning `preview.has_focus()`. If
   focus is not confirmed, the app retries for ~200 ms before falling back to
@@ -175,15 +174,22 @@ session bus. Design notes live here instead of in code comments.
   work area; `awtWorkAreaForWindowBounds` is AWT-space only. KDE currently
   inherits the AWT fallback and needs a backend override on HiDPI.
 - On GNOME, the extension can only place the preview once it is mapped, so the
-  app maps it with opacity 0, calls `ShowPreview` (atomic unmaximize + move +
-  maximize + activate), then reveals it. Client-side moves of a maximized window
-  race the WM and can leave the preview maximized on the previous monitor.
+  app captures the target on `Dispatchers.IO` while the preview is still hidden,
+  then maps it and calls `ShowPreview` (atomic unmaximize + move + maximize +
+  activate) without waiting for `isShowing`; the extension retries until the
+  preview is mapped. `ShowPreview` only activates when the preview is already
+  maximized on the target monitor; otherwise it restores, moves and maximizes.
+  If the atomic call cannot place the preview, the app hides it instead of
+  revealing an unplaced window. Focus retries use the pid-guarded
+  `FocusPreviewForPid`. Never toggle `isResizable` on the preview: fixed-size
+  hints can undo the shell-side maximize. Client-side moves of a maximized
+  window also race the WM and can leave the preview on the previous monitor.
   `CaptureActiveWindow` returns the logical work area; use
   `WindowManager.getWorkArea(window)` so capture does not spawn a second
-  `GetCapturedWindow` call. Extensions without the pid-aware `ShowPreview` fall
-  back to AWT placement and separate `PlacePreview`/`FocusPreview` calls; a
-  failed atomic call on a new extension is not retried through those title-based
-  methods because they can target a foreign window.
+  `GetCapturedWindow` call. Extensions without the newer atomic preview methods
+  fall back to AWT placement and separate `PlacePreview`/`FocusPreview` calls;
+  a failed atomic call on a new extension is not retried through those
+  title-based methods because they can target a foreign window.
 - On X11 and macOS, `preparePreview` restores and positions the still-hidden
   window before it is mapped; KDE skips the hidden restore (an unmapped XWayland
   preview is absent from KWin's window list) and positions it after mapping. The
