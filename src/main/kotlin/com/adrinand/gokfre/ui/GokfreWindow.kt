@@ -178,9 +178,7 @@ fun GokfreWindow(
                     }
                     .focusable(),
         ) {
-            if (previewReady) {
-                LayoutPreviewScreen(viewModel, selectedKeys = selectedKeys.toSet())
-            }
+            LayoutPreviewScreen(viewModel, selectedKeys = selectedKeys.toSet())
         }
     }
 
