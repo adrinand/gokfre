@@ -147,7 +147,6 @@ fun GokfreWindow(
                 window.skipTaskbarX11()
             }
 
-            window.setOpacitySafely(0f)
             window.bounds = arrangementController.targetWorkArea ?: window.workAreaBounds()
         }
 
@@ -191,7 +190,6 @@ fun GokfreWindow(
 
         if (!visible) {
             logger.info { "LaunchedEffect: hiding preview" }
-            win.setOpacitySafely(0f)
             previewReady = false
             mapped = false
             return@LaunchedEffect
@@ -201,7 +199,6 @@ fun GokfreWindow(
         logger.info {
             "LaunchedEffect: showing preview, isVisible=${win.isVisible}, isShowing=${win.isShowing}"
         }
-        win.setOpacitySafely(0f)
         val manager = arrangementController.windowManager
         try {
             if (manager.previewRequiresMappedWindow) {
@@ -231,7 +228,6 @@ fun GokfreWindow(
                 }
                 if (!placed) {
                     logger.warning { "Could not place the preview; hiding it" }
-                    win.setOpacitySafely(0f)
                     mapped = false
                     onClose()
                     return@LaunchedEffect
@@ -272,7 +268,6 @@ fun GokfreWindow(
             logger.warning { "Preview placement failed: $e" }
         }
 
-        win.setOpacitySafely(1f)
         previewReady = true
         logger.info { "Preview show: revealed=${elapsedMs(showStartedAt)}ms" }
         runCatching { focusRequester.requestFocus() }
