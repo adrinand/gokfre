@@ -49,6 +49,8 @@ const val PREVIEW_WINDOW_TITLE = "Gokfre Preview"
 private const val SHOW_POLL_INTERVAL_MS = 10L
 private const val MAP_WATCH_INTERVAL_MS = 5L
 private const val MAX_SHOW_WAIT_MS = 500L
+private const val ACTIVATE_WAIT_TIMEOUT_MS = 250L
+private const val ACTIVATE_WAIT_POLL_MS = 10L
 private const val PREPARE_WAIT_TIMEOUT_MS = 500L
 private const val FULLSCREEN_WAIT_TIMEOUT_MS = 2_000L
 private const val FADE_IN_MS = 50
@@ -268,6 +270,7 @@ fun GokfreWindow(
             logger.warning { "Preview placement failed: $e" }
         }
 
+        awaitActive(win)
         previewReady = true
         logger.info { "Preview show: revealed=${elapsedMs(showStartedAt)}ms" }
         runCatching {
@@ -276,6 +279,8 @@ fun GokfreWindow(
                     "active=${win.isActive}, opacity=${win.opacity}, bounds=${win.bounds}"
             }
         }.onFailure { logger.warning { "Could not read preview state: $it" } }
+        runCatching { win.toFront() }
+            .onFailure { logger.warning { "Could not raise the preview: $it" } }
         runCatching { focusRequester.requestFocus() }
             .onFailure { logger.warning { "re-request focus failed: $it" } }
     }
@@ -293,6 +298,16 @@ private suspend fun captureTarget(controller: ArrangementController) {
 }
 
 private fun elapsedMs(startedAt: Long): Long = (System.nanoTime() - startedAt) / NANOS_PER_MILLISECOND
+
+private suspend fun awaitActive(win: Window) {
+    val deadline = System.nanoTime() + ACTIVATE_WAIT_TIMEOUT_MS * NANOS_PER_MILLISECOND
+    while (!win.isActive && System.nanoTime() < deadline) {
+        delay(ACTIVATE_WAIT_POLL_MS.milliseconds)
+    }
+    if (!win.isActive) {
+        logger.warning { "Preview window did not become active before reveal" }
+    }
+}
 
 private suspend fun awaitShowing(win: Window) {
     var waitedMs = 0L
