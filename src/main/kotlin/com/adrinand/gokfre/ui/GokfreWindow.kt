@@ -270,6 +270,12 @@ fun GokfreWindow(
 
         previewReady = true
         logger.info { "Preview show: revealed=${elapsedMs(showStartedAt)}ms" }
+        runCatching {
+            logger.info {
+                "Preview state: visible=${win.isVisible}, showing=${win.isShowing}, " +
+                    "active=${win.isActive}, opacity=${win.opacity}, bounds=${win.bounds}"
+            }
+        }.onFailure { logger.warning { "Could not read preview state: $it" } }
         runCatching { focusRequester.requestFocus() }
             .onFailure { logger.warning { "re-request focus failed: $it" } }
     }
