@@ -10,10 +10,10 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import com.adrinand.gokfre.core.hotkey.Hotkey
+import com.adrinand.gokfre.core.hotkey.KeyCode
 import com.adrinand.gokfre.core.hotkey.ModifierKey
 import com.adrinand.gokfre.core.hotkey.toDisplayString
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
-import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,7 +59,7 @@ class HotkeySettingsScreenTest {
         }
         composeTestRule.waitForIdle()
 
-        val expected = Hotkey(NativeKeyEvent.VC_A, setOf(ModifierKey.CTRL, ModifierKey.SHIFT))
+        val expected = Hotkey(KeyCode.VC_A, setOf(ModifierKey.CTRL, ModifierKey.SHIFT))
         model.toggleHotkey shouldBe expected
         composeTestRule
             .onNodeWithText(expected.toDisplayString())

@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.adrinand.gokfre.core.hotkey.Hotkey
+import com.adrinand.gokfre.core.hotkey.hasNonShiftModifier
 import com.adrinand.gokfre.core.persistence.entity.PersistedLayoutSettings
 import com.adrinand.gokfre.core.persistence.entity.PersistedSettings
 import com.adrinand.gokfre.core.persistence.entity.toAppLayoutSettings
@@ -36,7 +37,7 @@ class SettingsViewModel(
 
     private fun load(persisted: PersistedSettings) {
         layoutSettings = persisted.layout.toAppLayoutSettings()
-        toggleHotkey = persisted.toggleHotkey
+        toggleHotkey = persisted.toggleHotkey.takeIf { it.hasNonShiftModifier() } ?: Hotkey.DEFAULT_TOGGLE
     }
 
     @OptIn(FlowPreview::class)

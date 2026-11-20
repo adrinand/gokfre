@@ -6,7 +6,6 @@ ktlint = "12.1.1"
 kover = "0.9.8"
 compose = "1.7.3"
 jna = "5.14.0"
-jnativehook = "2.2.2"
 kotlinx-serialization = "1.7.3"
 slf4j = "2.0.7"
 systemtray = "4.4"
@@ -17,7 +16,6 @@ kotest-runner-junit5 = { group = "io.kotest", name = "kotest-runner-junit5", ver
 kotest-assertions-core = { group = "io.kotest", name = "kotest-assertions-core", version.ref = "kotest" }
 detekt-formatting = { group = "io.gitlab.arturbosch.detekt", name = "detekt-formatting", version.ref = "detekt" }
 jna-platform = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
-jnativehook = { group = "com.github.kwhat", name = "jnativehook", version.ref = "jnativehook" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 slf4j-nop = { group = "org.slf4j", name = "slf4j-nop", version.ref = "slf4j" }
 dorkbox-systemtray = { group = "com.dorkbox", name = "SystemTray", version.ref = "systemtray" }

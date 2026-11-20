@@ -15,7 +15,8 @@ window.
 - **State:** Compose `mutableStateOf` / `SnapshotStateList`, persisted as JSON
   via kotlinx.serialization.
 - **Native interop:** JNA for platform APIs; Rust `kbd-global` crate for Linux
-  evdev global hotkeys.
+  evdev global hotkeys; Carbon `RegisterEventHotKey` via JNA for macOS global
+  hotkeys.
 - **D-Bus:** `dbus-java` (core + native unixsocket transport) is used on KDE to
   host the bridge KWin scripts report through.
 - **Testing:** Kotest + JUnit 4 (Compose UI tests via `createComposeRule`),
@@ -203,7 +204,9 @@ session bus. Design notes live here instead of in code comments.
 - **Global hotkeys:** Linux evdev needs `/dev/input/event*` and `/dev/uinput`
   access. The Rust native lib must be rebuilt after changes. The grab+forward
   path can deliver one physical event twice (physical + virtual device); rapid
-  callbacks are coalesced so one press produces one toggle.
+  callbacks are coalesced so one press produces one toggle. macOS registers a
+  Carbon hotkey through JNA, so the keystroke is consumed before the front app;
+  a conflicting system or global hotkey fails with `eventHotKeyExistsErr`.
 - **Single-instance socket:** `AppSocketComms` uses a fixed Unix socket path
   under `/tmp`. Tests use isolated settings paths but share the socket logic.
 - **Settings persistence:** `SettingsRepository` auto-saves with a 500ms

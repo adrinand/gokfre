@@ -36,6 +36,7 @@ import com.adrinand.gokfre.core.hotkey.DISPLAY_NAME_TO_KEY_CODE
 import com.adrinand.gokfre.core.hotkey.Hotkey
 import com.adrinand.gokfre.core.hotkey.ModifierKey
 import com.adrinand.gokfre.core.hotkey.getDisplayCharFromKeyEvent
+import com.adrinand.gokfre.core.hotkey.hasNonShiftModifier
 import com.adrinand.gokfre.core.hotkey.toDisplayString
 import com.adrinand.gokfre.core.hotkey.toModifierKey
 
@@ -135,9 +136,11 @@ internal fun captureHotkeyFromKeyEvent(
 ): Hotkey? {
     val displayName = event.getDisplayCharFromKeyEvent()
     val keyCode = displayName?.let { DISPLAY_NAME_TO_KEY_CODE[it] }
+    val hasNonShiftModifier = modifiers.hasNonShiftModifier()
     val isValidKeyDown = event.type == KeyEventType.KeyDown && keyCode != null
+    val isValidHotkey = isValidKeyDown && hasNonShiftModifier
 
-    return if (isValidKeyDown && modifiers.isNotEmpty()) {
+    return if (isValidHotkey) {
         Hotkey(keyCode, modifiers)
     } else {
         null

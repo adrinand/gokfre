@@ -11,8 +11,8 @@ import androidx.compose.runtime.snapshotFlow
 import com.adrinand.gokfre.core.hotkey.GlobalHotkeyProvider
 import com.adrinand.gokfre.core.hotkey.Hotkey
 import com.adrinand.gokfre.core.hotkey.InputDevicePermissionChecker
-import com.adrinand.gokfre.core.hotkey.JNativeHookProvider
 import com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider
+import com.adrinand.gokfre.core.hotkey.MacCarbonHotkeyProvider
 import com.adrinand.gokfre.core.hotkey.toDisplayString
 import com.adrinand.gokfre.core.screen.isAccessibilityTrusted
 import com.adrinand.gokfre.core.screen.isLinux
@@ -94,7 +94,7 @@ private fun registerHotkeySafely(
         hotkey
     } catch (e: IllegalStateException) {
         logger.warning("Failed to register hotkey $hotkey: ${e.message}")
-        viewModel.registrationError = "Failed to register hotkey ${hotkey.toDisplayString()}"
+        viewModel.registrationError = e.message ?: "Failed to register hotkey ${hotkey.toDisplayString()}"
         if (hotkey != previousHotkey) {
             viewModel.toggleHotkey = previousHotkey
         }
@@ -114,12 +114,9 @@ private fun createMacProvider(onPermissionMissing: () -> Unit): GlobalHotkeyProv
         onPermissionMissing()
         return null
     }
-    return runCatching { JNativeHookProvider() }
-        .onSuccess { logger.info { "Global hotkey provider initialized (JNativeHook)" } }
-        .onFailure {
-            logger.warning("Failed to initialize JNativeHook hotkey provider: ${it.message}")
-            onPermissionMissing()
-        }
+    return runCatching { MacCarbonHotkeyProvider() }
+        .onSuccess { logger.info { "Global hotkey provider initialized (Carbon)" } }
+        .onFailure { logger.warning("Failed to initialize Carbon hotkey provider: ${it.message}") }
         .getOrNull()
 }
 

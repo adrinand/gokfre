@@ -32,6 +32,9 @@ class LinuxEvdevHotkeyProvider(
         hotkey: Hotkey,
         callback: () -> Unit,
     ) {
+        check(hotkey.hasNonShiftModifier()) {
+            "Hotkey ${hotkey.toDisplayString()} must include Ctrl, Alt, or Super"
+        }
         val currentManager = manager ?: reinitialize()
         currentCallback = callback
 

@@ -47,13 +47,13 @@ A desktop tiling window manager for Linux and macOS. Press the global hotkey to 
    ./gradlew run
    ```
 
-   Gokfre uses JNativeHook for global hotkeys and the Accessibility API to arrange windows. The first run may prompt for accessibility and input-monitoring permissions; both must be granted for Gokfre to work.
+   Gokfre uses the Carbon `RegisterEventHotKey` API for global hotkeys and the Accessibility API to arrange windows. The first run may prompt for accessibility permission; it must be granted for Gokfre to work.
 
 ## Global hotkey
 
 - Default: **Super+K**
 - On Linux, the hotkey is registered via the `kbd-global` Rust crate reading from `/dev/input/event*`; this works on both X11 and Wayland.
-- On macOS, the hotkey is registered with JNativeHook.
+- On macOS, the hotkey is registered with Carbon's `RegisterEventHotKey`, so it is consumed before the focused app's own shortcuts. System shortcuts and other apps' global hotkeys cannot be overridden; Gokfre reports a registration error for those combinations.
 
 ### Wayland note
 
