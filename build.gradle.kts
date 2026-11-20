@@ -42,7 +42,6 @@ sourceSets {
 dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.jna.platform)
-    implementation(libs.jnativehook)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.dorkbox.systemtray)
     implementation(libs.dbus.java.core)
@@ -183,7 +182,7 @@ kover {
                     "com.adrinand.gokfre.ComposableSingletons*",
                     "com.adrinand.gokfre.core.screen.*",
                     "com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider*",
-                    "com.adrinand.gokfre.core.hotkey.JNativeHookProvider*",
+                    "com.adrinand.gokfre.core.hotkey.JnaCarbonHotkeyBinding*",
                     "com.adrinand.gokfre.core.hotkey.GokfreHotkeyNative*",
                     "com.adrinand.gokfre.core.hotkey.InputDevicePermissionChecker",
                     "com.adrinand.gokfre.ui.GokfreWindowKt*",

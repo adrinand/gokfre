@@ -1,13 +1,12 @@
 package com.adrinand.gokfre.core.hotkey
 
-import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 
 class HotkeyToKbdGlobalStringTest {
     @Test
     fun `Super plus K`() {
-        val hotkey = Hotkey(NativeKeyEvent.VC_K, setOf(ModifierKey.SUPER))
+        val hotkey = Hotkey(KeyCode.VC_K, setOf(ModifierKey.SUPER))
         hotkey.toKbdGlobalString() shouldBe "Super+K"
     }
 
@@ -15,7 +14,7 @@ class HotkeyToKbdGlobalStringTest {
     fun `Ctrl plus Shift plus A`() {
         val hotkey =
             Hotkey(
-                NativeKeyEvent.VC_A,
+                KeyCode.VC_A,
                 setOf(ModifierKey.CTRL, ModifierKey.SHIFT),
             )
         hotkey.toKbdGlobalString() shouldBe "Ctrl+Shift+A"
@@ -23,7 +22,7 @@ class HotkeyToKbdGlobalStringTest {
 
     @Test
     fun `plain key`() {
-        val hotkey = Hotkey(NativeKeyEvent.VC_F1)
+        val hotkey = Hotkey(KeyCode.VC_F1)
         hotkey.toKbdGlobalString() shouldBe "F1"
     }
 }

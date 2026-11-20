@@ -25,9 +25,9 @@ private const val DISMISS_BUTTON_LABEL = "OK"
 private const val TITLE = "Accessibility permission required"
 private const val BODY_TEXT =
     "macOS requires Gokfre to have Accessibility permission to arrange windows " +
-        "and Input Monitoring permission for the global hotkey."
+        "and register the global hotkey."
 private const val INSTRUCTION_TEXT =
-    "Grant both permissions in System Settings > Privacy & Security, " +
+    "Grant Accessibility permission in System Settings > Privacy & Security, " +
         "then restart Gokfre."
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.ui.MacAccessibilityWarningWindow")

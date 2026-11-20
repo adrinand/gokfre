@@ -1,6 +1,5 @@
 package com.adrinand.gokfre.core.hotkey
 
-import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent
 import io.kotest.matchers.shouldBe
 import org.junit.Assume
 import org.junit.Test
@@ -16,7 +15,7 @@ class LinuxEvdevHotkeyProviderTest {
         val invoked = AtomicBoolean(false)
         provider.register(
             Hotkey(
-                NativeKeyEvent.VC_K,
+                KeyCode.VC_K,
                 setOf(ModifierKey.SUPER),
             ),
         ) { invoked.set(true) }
@@ -34,7 +33,7 @@ class LinuxEvdevHotkeyProviderTest {
         val provider = LinuxEvdevHotkeyProvider()
         val hotkey =
             Hotkey(
-                NativeKeyEvent.VC_K,
+                KeyCode.VC_K,
                 setOf(ModifierKey.SUPER),
             )
         provider.register(hotkey) { }
