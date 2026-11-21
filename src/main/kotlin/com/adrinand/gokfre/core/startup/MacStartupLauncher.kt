@@ -1,6 +1,6 @@
 package com.adrinand.gokfre.core.startup
 
-import com.adrinand.gokfre.utils.PackagedAppLocator
+import com.adrinand.gokfre.utils.PackagedAppPathFinder
 import com.adrinand.gokfre.utils.writeAtomically
 import java.nio.file.Files
 import java.nio.file.Path
@@ -13,7 +13,7 @@ private val logger = Logger.getLogger("com.adrinand.gokfre.core.startup.MacStart
 
 class MacStartupLauncher(
     private val launchAgentsDir: Path = defaultLaunchAgentsDir(),
-    private val bundleResolver: () -> Path? = { PackagedAppLocator.macAppBundle() },
+    private val bundleResolver: () -> Path? = { PackagedAppPathFinder.macAppBundlePath() },
 ) : StartupLauncher {
     private val launchAgentFile = launchAgentsDir.resolve(LAUNCH_AGENT_FILE_NAME)
 

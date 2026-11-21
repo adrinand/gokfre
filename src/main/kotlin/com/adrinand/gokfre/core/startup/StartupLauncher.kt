@@ -22,7 +22,7 @@ fun createStartupLauncher(): StartupLauncher =
     when {
         isLinux() -> LinuxStartupLauncher()
         isMac() -> MacStartupLauncher()
-        else -> UnsupportedStartupLauncher
+        else -> throw UnsupportedOperationException("Launch at startup is not supported on this OS.")
     }
 
 internal fun Path.requireNoControlCharacters(description: String): Path {
@@ -38,15 +38,4 @@ internal fun Path.requirePermanentMacLocation(): Path {
         "Launch at startup requires Gokfre.app to be installed outside a disk image or temporary location."
     }
     return this
-}
-
-private object UnsupportedStartupLauncher : StartupLauncher {
-    override fun isEnabled(): Boolean = false
-
-    override fun enable(): Result<Unit> =
-        Result.failure(
-            UnsupportedOperationException("Launch at startup is not supported on this OS."),
-        )
-
-    override fun disable(): Result<Unit> = Result.success(Unit)
 }
