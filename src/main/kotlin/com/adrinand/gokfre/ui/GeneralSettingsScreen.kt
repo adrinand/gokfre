@@ -31,7 +31,7 @@ fun GeneralSettingsScreen(
     ) {
         Text(
             text = "General Settings",
-            fontSize = 20.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
         )
 

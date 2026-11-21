@@ -1,5 +1,7 @@
 package com.adrinand.gokfre.core.startup
 
+import com.adrinand.gokfre.utils.PackagedAppLocator
+import com.adrinand.gokfre.utils.writeAtomically
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path

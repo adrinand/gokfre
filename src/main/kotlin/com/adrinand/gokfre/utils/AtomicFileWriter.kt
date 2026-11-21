@@ -1,4 +1,4 @@
-package com.adrinand.gokfre.core.startup
+package com.adrinand.gokfre.utils
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.AtomicMoveNotSupportedException

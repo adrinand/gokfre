@@ -1,4 +1,4 @@
-package com.adrinand.gokfre.core.startup
+package com.adrinand.gokfre.utils
 
 import java.nio.file.Files
 import java.nio.file.LinkOption

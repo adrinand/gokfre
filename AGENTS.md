@@ -35,6 +35,7 @@ src/main/kotlin/com/adrinand/gokfre/
   core/startup/           # Launch-at-login registration for Linux and macOS.
   core/comms/             # Unix-domain socket single-instance handshake.
   core/logging/           # AppLogging initialization.
+  utils/                  # Shared filesystem and packaging helpers.
 lib/gokfre-hotkey/        # Rust library for Linux evdev hotkeys.
 extensions/               # GNOME Shell extension.
 ```
