@@ -13,6 +13,8 @@ import java.awt.Window
 
 fun isLinux(): Boolean = System.getProperty("os.name").lowercase().contains("linux")
 
+fun isMac(): Boolean = System.getProperty("os.name").lowercase().let { it.contains("mac") || it.contains("darwin") }
+
 fun isX11Session(): Boolean = System.getenv("XDG_SESSION_TYPE")?.lowercase() == "x11"
 
 fun GraphicsConfiguration.workAreaBounds(): Rectangle {

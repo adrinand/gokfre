@@ -2,6 +2,7 @@ package com.adrinand.gokfre
 
 import com.adrinand.gokfre.core.comms.AppSocketComms
 import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
+import com.adrinand.gokfre.core.startup.StartupLauncher
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.channels.Channel
 import java.awt.Window
@@ -13,6 +14,14 @@ import kotlin.concurrent.thread
 import kotlin.io.path.createTempDirectory
 
 private const val READY_TIMEOUT_SECONDS = 30L
+
+private object E2EStartupLauncher : StartupLauncher {
+    override fun isEnabled(): Boolean = false
+
+    override fun enable(): Result<Unit> = Result.success(Unit)
+
+    override fun disable(): Result<Unit> = Result.success(Unit)
+}
 
 /**
  * Handle to a running gokfre E2E instance.
@@ -96,6 +105,7 @@ object E2EApplication {
                     onReady = { readyLatch.countDown() },
                     shutdownChannel = shutdownChannel,
                     settingsRepository = SettingsRepository(settingsPath),
+                    startupLauncher = E2EStartupLauncher,
                     globalHotkeyProvider = hotkeyProvider,
                     toggleDispatcher = { it() },
                 )

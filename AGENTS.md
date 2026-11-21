@@ -32,6 +32,7 @@ src/main/kotlin/com/adrinand/gokfre/
   core/screen/            # WindowManager abstraction + OS backends.
   core/hotkey/            # Global hotkey abstraction + providers.
   core/persistence/       # SettingsRepository + serialized entities.
+  core/startup/           # Launch-at-login registration for Linux and macOS.
   core/comms/             # Unix-domain socket single-instance handshake.
   core/logging/           # AppLogging initialization.
 lib/gokfre-hotkey/        # Rust library for Linux evdev hotkeys.

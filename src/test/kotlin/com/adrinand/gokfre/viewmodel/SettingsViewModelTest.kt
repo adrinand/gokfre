@@ -79,6 +79,7 @@ class SettingsViewModelTest {
                         keyLabels = listOf(listOf("M", "N")),
                     ),
                 toggleHotkey = Hotkey(99, setOf(ModifierKey.ALT)),
+                launchAtStartup = true,
             )
         repository.save(persisted)
 
@@ -88,6 +89,7 @@ class SettingsViewModelTest {
         viewModel.layoutSettings.rowWeights.toList() shouldBe listOf(3)
         viewModel.layoutSettings.keyLabels.map { it.toList() } shouldBe listOf(listOf("M", "N"))
         viewModel.toggleHotkey shouldBe Hotkey(99, setOf(ModifierKey.ALT))
+        viewModel.launchAtStartup shouldBe true
     }
 
     @Test
@@ -111,11 +113,13 @@ class SettingsViewModelTest {
 
         viewModel.layoutSettings.columnWeights[0] = 5
         viewModel.toggleHotkey = Hotkey(20, setOf(ModifierKey.SUPER))
+        viewModel.updateLaunchAtStartup(true)
         Thread.sleep(AUTO_SAVE_WAIT_MILLIS)
 
         val loaded = repository.load().shouldNotBeNull()
         loaded.layout.columnWeights shouldBe listOf(5, 1, 1, 1)
         loaded.toggleHotkey shouldBe Hotkey(20, setOf(ModifierKey.SUPER))
+        loaded.launchAtStartup shouldBe true
     }
 
     private fun createRepository(): SettingsRepository =

@@ -3,6 +3,8 @@ package com.adrinand.gokfre.ui
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -13,6 +15,7 @@ import com.adrinand.gokfre.core.hotkey.Hotkey
 import com.adrinand.gokfre.core.hotkey.KeyCode
 import com.adrinand.gokfre.core.hotkey.ModifierKey
 import com.adrinand.gokfre.core.hotkey.toDisplayString
+import com.adrinand.gokfre.core.startup.StartupLauncher
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalTestApi::class)
-class HotkeySettingsScreenTest {
+class GeneralSettingsScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
@@ -29,13 +32,16 @@ class HotkeySettingsScreenTest {
         get() = SettingsViewModel(CoroutineScope(Dispatchers.Unconfined))
 
     @Test
-    fun `hotkey settings screen renders its subcomponents`() {
+    fun `general settings screen renders its subcomponents`() {
         val model = viewModel
         composeTestRule.setContent {
-            HotkeySettingsScreen(viewModel = model)
+            GeneralSettingsScreen(viewModel = model)
         }
 
         composeTestRule.onNodeWithTag(SCREEN_TAG).assertExists()
+        composeTestRule.onNodeWithText("General Settings").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Launch at startup").assertIsDisplayed()
+        composeTestRule.onNodeWithTag(STARTUP_SWITCH_TAG).assertExists()
         composeTestRule.onNodeWithTag(INPUT_TAG).assertExists()
         composeTestRule
             .onNodeWithText(model.toggleHotkey.toDisplayString())
@@ -43,10 +49,45 @@ class HotkeySettingsScreenTest {
     }
 
     @Test
+    fun `startup switch reflects and updates the view model`() {
+        val model = viewModel
+        composeTestRule.setContent {
+            GeneralSettingsScreen(viewModel = model)
+        }
+
+        composeTestRule.onNodeWithTag(STARTUP_SWITCH_TAG).assertIsOff()
+
+        composeTestRule.onNodeWithTag(STARTUP_SWITCH_TAG).performClick()
+        composeTestRule.waitForIdle()
+
+        model.launchAtStartup shouldBe true
+        composeTestRule.onNodeWithTag(STARTUP_SWITCH_TAG).assertIsOn()
+    }
+
+    @Test
+    fun `startup failure shows an error dialog`() {
+        val model =
+            SettingsViewModel(
+                CoroutineScope(Dispatchers.Unconfined),
+                startupLauncher = FailingStartupLauncher,
+                ioDispatcher = Dispatchers.Unconfined,
+            )
+        composeTestRule.setContent {
+            GeneralSettingsScreen(viewModel = model)
+        }
+
+        composeTestRule.onNodeWithTag(STARTUP_SWITCH_TAG).performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(STARTUP_ERROR_DIALOG_TAG).assertExists()
+        composeTestRule.onNodeWithText(FAILURE_MESSAGE).assertIsDisplayed()
+    }
+
+    @Test
     fun `clicking capture input and entering a valid combo updates the toggle hotkey`() {
         val model = viewModel
         composeTestRule.setContent {
-            HotkeySettingsScreen(viewModel = model)
+            GeneralSettingsScreen(viewModel = model)
         }
 
         composeTestRule.onNodeWithTag(INPUT_TAG).performClick()
@@ -72,7 +113,7 @@ class HotkeySettingsScreenTest {
         val originalHotkey = model.toggleHotkey
 
         composeTestRule.setContent {
-            HotkeySettingsScreen(viewModel = model)
+            GeneralSettingsScreen(viewModel = model)
         }
 
         composeTestRule.onNodeWithTag(INPUT_TAG).performClick()
@@ -89,8 +130,19 @@ class HotkeySettingsScreenTest {
             .assertIsDisplayed()
     }
 
+    private object FailingStartupLauncher : StartupLauncher {
+        override fun isEnabled(): Boolean = false
+
+        override fun enable(): Result<Unit> = Result.failure(IllegalStateException(FAILURE_MESSAGE))
+
+        override fun disable(): Result<Unit> = Result.success(Unit)
+    }
+
     private companion object {
-        const val SCREEN_TAG = "hotkey-settings-screen"
+        const val SCREEN_TAG = "general-settings-screen"
         const val INPUT_TAG = "hotkey-capture-input"
+        const val STARTUP_SWITCH_TAG = "launch-at-startup-switch"
+        const val STARTUP_ERROR_DIALOG_TAG = "startup-error-dialog"
+        const val FAILURE_MESSAGE = "Launcher unavailable"
     }
 }

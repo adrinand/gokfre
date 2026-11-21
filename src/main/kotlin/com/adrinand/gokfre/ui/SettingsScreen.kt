@@ -18,7 +18,7 @@ import com.adrinand.gokfre.viewmodel.SettingsViewModel
 
 private enum class SettingsTab {
     LAYOUT,
-    HOTKEY,
+    GENERAL,
 }
 
 @Composable
@@ -37,11 +37,11 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     modifier = Modifier.testTag("layout-tab"),
                 )
                 BottomNavigationItem(
-                    selected = selectedTab == SettingsTab.HOTKEY,
-                    onClick = { selectedTab = SettingsTab.HOTKEY },
-                    icon = { Text("H") },
-                    label = { Text("Hotkeys") },
-                    modifier = Modifier.testTag("hotkey-tab"),
+                    selected = selectedTab == SettingsTab.GENERAL,
+                    onClick = { selectedTab = SettingsTab.GENERAL },
+                    icon = { Text("G") },
+                    label = { Text("General") },
+                    modifier = Modifier.testTag("general-tab"),
                 )
             }
         },
@@ -52,7 +52,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             if (selectedTab == SettingsTab.LAYOUT) {
                 LayoutSettingsScreen(viewModel)
             } else {
-                HotkeySettingsScreen(viewModel)
+                GeneralSettingsScreen(viewModel)
             }
         }
     }
