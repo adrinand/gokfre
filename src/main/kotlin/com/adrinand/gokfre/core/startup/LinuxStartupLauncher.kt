@@ -1,6 +1,6 @@
 package com.adrinand.gokfre.core.startup
 
-import com.adrinand.gokfre.utils.PackagedAppLocator
+import com.adrinand.gokfre.utils.PackagedAppPathFinder
 import com.adrinand.gokfre.utils.writeAtomically
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -13,7 +13,7 @@ private val logger = Logger.getLogger("com.adrinand.gokfre.core.startup.LinuxSta
 
 class LinuxStartupLauncher(
     private val autostartDir: Path = defaultAutostartDir(),
-    private val executableResolver: () -> Path? = { PackagedAppLocator.linuxExecutable() },
+    private val executableResolver: () -> Path? = { PackagedAppPathFinder.linuxExecutablePath() },
 ) : StartupLauncher {
     private val desktopFile = autostartDir.resolve(DESKTOP_FILE_NAME)
 
