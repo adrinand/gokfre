@@ -1,11 +1,5 @@
 package com.adrinand.gokfre.core.hotkey
 
-/**
- * Layout-independent key codes stored in [Hotkey.keyCode].
- *
- * The values match the historical JNativeHook `VC_*` codes so existing
- * persisted settings remain valid.
- */
 object KeyCode {
     const val VC_A = 0x1E
     const val VC_B = 0x30

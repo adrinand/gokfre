@@ -5,12 +5,10 @@ internal data class CarbonHotkey(
     val modifiers: Int,
 )
 
-// Carbon's cmdKey/shiftKey/optionKey/controlKey values are duplicated here so
-// Linux test runs never load the macOS framework.
-internal const val CARBON_CMD_KEY = 0x0100
-internal const val CARBON_SHIFT_KEY = 0x0200
-internal const val CARBON_OPTION_KEY = 0x0800
-internal const val CARBON_CONTROL_KEY = 0x1000
+private const val CARBON_CMD_KEY = 0x0100
+private const val CARBON_SHIFT_KEY = 0x0200
+private const val CARBON_OPTION_KEY = 0x0800
+private const val CARBON_CONTROL_KEY = 0x1000
 
 private object CarbonKeyCode {
     const val A = 0x00

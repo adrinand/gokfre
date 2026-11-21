@@ -16,10 +16,6 @@ data class Hotkey(
     }
 }
 
-/**
- * Shift-only and modifier-less combinations must never be grabbed globally:
- * a consuming hotkey would swallow ordinary typing.
- */
 internal fun Set<ModifierKey>.hasNonShiftModifier(): Boolean = any { it != ModifierKey.SHIFT }
 
 internal fun Hotkey.hasNonShiftModifier(): Boolean = modifiers.hasNonShiftModifier()

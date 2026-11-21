@@ -136,9 +136,8 @@ internal fun captureHotkeyFromKeyEvent(
 ): Hotkey? {
     val displayName = event.getDisplayCharFromKeyEvent()
     val keyCode = displayName?.let { DISPLAY_NAME_TO_KEY_CODE[it] }
-    val hasNonShiftModifier = modifiers.hasNonShiftModifier()
     val isValidKeyDown = event.type == KeyEventType.KeyDown && keyCode != null
-    val isValidHotkey = isValidKeyDown && hasNonShiftModifier
+    val isValidHotkey = isValidKeyDown && modifiers.hasNonShiftModifier()
 
     return if (isValidHotkey) {
         Hotkey(keyCode, modifiers)

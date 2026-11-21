@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Logger
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.core.hotkey.MacCarbonHotkeyProvider")
-
 private const val EVENT_HOT_KEY_EXISTS_ERR = -9878
 private const val PARAM_ERR = -50
 
