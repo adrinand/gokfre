@@ -12,11 +12,15 @@ import com.adrinand.gokfre.core.persistence.entity.PersistedLayoutSettings
 import com.adrinand.gokfre.core.persistence.entity.PersistedSettings
 import com.adrinand.gokfre.core.persistence.entity.toAppLayoutSettings
 import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
+import com.adrinand.gokfre.core.startup.StartupLauncher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val SAVE_DEBOUNCE_MILLIS = 500L
@@ -24,20 +28,58 @@ private const val SAVE_DEBOUNCE_MILLIS = 500L
 class SettingsViewModel(
     private val coroutineScope: CoroutineScope,
     private val repository: SettingsRepository? = null,
+    private val startupLauncher: StartupLauncher? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     var layoutSettings: AppLayoutSettings by mutableStateOf(AppLayoutSettings.default())
     var toggleHotkey: Hotkey by mutableStateOf(Hotkey.DEFAULT_TOGGLE)
+    var launchAtStartup: Boolean by mutableStateOf(false)
+    var startupError: String? by mutableStateOf(null)
     var registrationError: String? by mutableStateOf(null)
     var isHotkeyCaptureActive: Boolean by mutableStateOf(false)
 
     init {
         repository?.load()?.let { load(it) }
+        syncStartupState()
         startAutoSave()
     }
 
     private fun load(persisted: PersistedSettings) {
         layoutSettings = persisted.layout.toAppLayoutSettings()
         toggleHotkey = persisted.toggleHotkey.takeIf { it.hasNonShiftModifier() } ?: Hotkey.DEFAULT_TOGGLE
+        launchAtStartup = persisted.launchAtStartup
+    }
+
+    private fun syncStartupState() {
+        val launcher = startupLauncher ?: return
+        coroutineScope.launch {
+            val enabled =
+                withContext(ioDispatcher) {
+                    runCatching { launcher.isEnabled() }.getOrDefault(launchAtStartup)
+                }
+            launchAtStartup = enabled
+        }
+    }
+
+    fun updateLaunchAtStartup(enabled: Boolean) {
+        val launcher =
+            startupLauncher ?: run {
+                launchAtStartup = enabled
+                return
+            }
+        coroutineScope.launch {
+            val result =
+                withContext(ioDispatcher) {
+                    if (enabled) launcher.enable() else launcher.disable()
+                }
+            result
+                .onSuccess {
+                    launchAtStartup = enabled
+                    startupError = null
+                }.onFailure {
+                    startupError = it.message ?: "Failed to update the launch at startup setting."
+                }
+        }
     }
 
     @OptIn(FlowPreview::class)
@@ -49,6 +91,7 @@ class SettingsViewModel(
                 PersistedSettings(
                     layout = layoutSettings.toPersisted(),
                     toggleHotkey = toggleHotkey,
+                    launchAtStartup = launchAtStartup,
                 )
             }
                 .distinctUntilChanged()

@@ -15,6 +15,8 @@ import com.adrinand.gokfre.core.screen.ArrangementController
 import com.adrinand.gokfre.core.screen.WindowManager
 import com.adrinand.gokfre.core.screen.createWindowManager
 import com.adrinand.gokfre.core.screen.isLinux
+import com.adrinand.gokfre.core.startup.StartupLauncher
+import com.adrinand.gokfre.core.startup.createStartupLauncher
 import com.adrinand.gokfre.ui.GokfreTray
 import com.adrinand.gokfre.ui.GokfreWindow
 import com.adrinand.gokfre.ui.InputPermissionWarningDialog
@@ -60,6 +62,7 @@ fun runGokfreApplication(
     onViewModelCreated: (SettingsViewModel) -> Unit = {},
     shutdownChannel: Channel<Unit> = Channel(),
     settingsRepository: SettingsRepository? = null,
+    startupLauncher: StartupLauncher? = null,
     globalHotkeyProvider: GlobalHotkeyProvider? = null,
     toggleDispatcher: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
 ) {
@@ -69,9 +72,18 @@ fun runGokfreApplication(
                 .onFailure { logger.warning("Failed to initialize settings repository: ${it.message}") }
                 .getOrNull()
 
+    val effectiveStartupLauncher =
+        startupLauncher
+            ?: runCatching { createStartupLauncher() }
+                .onFailure { logger.warning("Failed to initialize startup launcher: ${it.message}") }
+                .getOrNull()
+
     application(exitProcessOnExit = exitProcessOnExit) {
         val settingsCoroutineScope = rememberCoroutineScope()
-        val settingsViewModel = remember { SettingsViewModel(settingsCoroutineScope, effectiveSettingsRepository) }
+        val settingsViewModel =
+            remember {
+                SettingsViewModel(settingsCoroutineScope, effectiveSettingsRepository, effectiveStartupLauncher)
+            }
         LaunchedEffect(settingsViewModel) {
             onViewModelCreated(settingsViewModel)
         }

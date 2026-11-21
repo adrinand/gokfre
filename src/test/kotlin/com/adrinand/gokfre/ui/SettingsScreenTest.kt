@@ -30,18 +30,18 @@ class SettingsScreenTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag(LAYOUT_SCREEN_TAG).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(HOTKEY_SCREEN_TAG).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(GENERAL_SCREEN_TAG).assertDoesNotExist()
     }
 
     @Test
-    fun `settings screen renders hotkey settings when hotkey tab is selected`() {
+    fun `settings screen renders general settings when general tab is selected`() {
         setContentWithSettings()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithTag(HOTKEY_TAB_TAG).performClick()
+        composeTestRule.onNodeWithTag(GENERAL_TAB_TAG).performClick()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithTag(HOTKEY_SCREEN_TAG).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(GENERAL_SCREEN_TAG).assertIsDisplayed()
         composeTestRule.onNodeWithTag(LAYOUT_SCREEN_TAG).assertDoesNotExist()
     }
 
@@ -50,20 +50,20 @@ class SettingsScreenTest {
         setContentWithSettings()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithTag(HOTKEY_TAB_TAG).performClick()
+        composeTestRule.onNodeWithTag(GENERAL_TAB_TAG).performClick()
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag(LAYOUT_TAB_TAG).performClick()
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag(LAYOUT_SCREEN_TAG).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(HOTKEY_SCREEN_TAG).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(GENERAL_SCREEN_TAG).assertDoesNotExist()
     }
 
     private companion object {
         const val LAYOUT_SCREEN_TAG = "layout-screen"
-        const val HOTKEY_SCREEN_TAG = "hotkey-settings-screen"
+        const val GENERAL_SCREEN_TAG = "general-settings-screen"
         const val LAYOUT_TAB_TAG = "layout-tab"
-        const val HOTKEY_TAB_TAG = "hotkey-tab"
+        const val GENERAL_TAB_TAG = "general-tab"
     }
 }

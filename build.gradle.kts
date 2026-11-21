@@ -181,6 +181,7 @@ kover {
                     "com.adrinand.gokfre.MainKt*",
                     "com.adrinand.gokfre.ComposableSingletons*",
                     "com.adrinand.gokfre.core.screen.*",
+                    "com.adrinand.gokfre.core.startup.*",
                     "com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider*",
                     "com.adrinand.gokfre.core.hotkey.JnaCarbonHotkeyBinding*",
                     "com.adrinand.gokfre.core.hotkey.GokfreHotkeyNative*",

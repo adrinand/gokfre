@@ -13,6 +13,7 @@ data class PersistedSettings(
     val version: Int = CURRENT_SETTINGS_VERSION,
     val layout: PersistedLayoutSettings = PersistedLayoutSettings(),
     val toggleHotkey: Hotkey = Hotkey.DEFAULT_TOGGLE,
+    val launchAtStartup: Boolean = false,
 )
 
 @Serializable

@@ -36,6 +36,7 @@ class SettingsRepositoryTest {
                         keyLabels = listOf(listOf("A", "B"), listOf("C", "D"), listOf("E", "F")),
                     ),
                 toggleHotkey = Hotkey(42, setOf(ModifierKey.CTRL, ModifierKey.SHIFT)),
+                launchAtStartup = true,
             )
 
         repository.save(settings)
