@@ -1,6 +1,5 @@
 package com.adrinand.gokfre.core.hotkey
 
-import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -11,11 +10,15 @@ data class Hotkey(
     companion object {
         val DEFAULT_TOGGLE =
             Hotkey(
-                keyCode = NativeKeyEvent.VC_K,
+                keyCode = KeyCode.VC_K,
                 modifiers = setOf(ModifierKey.SUPER),
             )
     }
 }
+
+internal fun Set<ModifierKey>.hasNonShiftModifier(): Boolean = any { it != ModifierKey.SHIFT }
+
+internal fun Hotkey.hasNonShiftModifier(): Boolean = modifiers.hasNonShiftModifier()
 
 fun Hotkey.toDisplayString(): String {
     val modifierNames =

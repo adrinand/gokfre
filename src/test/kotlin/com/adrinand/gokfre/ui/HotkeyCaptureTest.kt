@@ -16,8 +16,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import com.adrinand.gokfre.core.hotkey.Hotkey
+import com.adrinand.gokfre.core.hotkey.KeyCode
 import com.adrinand.gokfre.core.hotkey.ModifierKey
-import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.Rule
@@ -61,7 +61,18 @@ class HotkeyCaptureTest {
             }
 
         captureHotkeyFromKeyEvent(event!!, setOf(ModifierKey.SUPER)) shouldBe
-            Hotkey(NativeKeyEvent.VC_K, setOf(ModifierKey.SUPER))
+            Hotkey(KeyCode.VC_K, setOf(ModifierKey.SUPER))
+    }
+
+    @Test
+    fun `shift only character is ignored`() {
+        val event =
+            captureKeyEvent {
+                keyDown(Key.ShiftLeft)
+                keyDown(Key.K)
+            }
+
+        captureHotkeyFromKeyEvent(event!!, setOf(ModifierKey.SHIFT)) shouldBe null
     }
 
     @Test
@@ -74,7 +85,7 @@ class HotkeyCaptureTest {
             }
 
         captureHotkeyFromKeyEvent(event!!, setOf(ModifierKey.CTRL, ModifierKey.SHIFT)) shouldBe
-            Hotkey(NativeKeyEvent.VC_A, setOf(ModifierKey.CTRL, ModifierKey.SHIFT))
+            Hotkey(KeyCode.VC_A, setOf(ModifierKey.CTRL, ModifierKey.SHIFT))
     }
 
     @Test

@@ -1,9 +1,10 @@
 #!/bin/bash
 # Sets up a macOS environment for E2E tests.
-# JNativeHook requires Accessibility permission for the test JVM. On GitHub-
-# hosted runners this cannot be granted via the normal UI prompt, so the tests
-# may skip global-hotkey assertions. Startup/persistence/single-instance tests
-# do not require Accessibility.
+# Gokfre requires Accessibility permission for the test JVM (window arrangement
+# and the macOS hotkey provider gate). On GitHub-hosted runners this cannot be
+# granted via the normal UI prompt, so the tests may skip global-hotkey
+# assertions. Startup/persistence/single-instance tests do not require
+# Accessibility.
 set -euo pipefail
 
 # Enable automation mode so accessibility-related prompts do not block CI.

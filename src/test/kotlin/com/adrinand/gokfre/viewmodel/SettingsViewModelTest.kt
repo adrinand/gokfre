@@ -91,6 +91,20 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `unsafe persisted hotkey falls back to default`() {
+        val repository = createRepository()
+        repository.save(
+            PersistedSettings(
+                toggleHotkey = Hotkey(Hotkey.DEFAULT_TOGGLE.keyCode, setOf(ModifierKey.SHIFT)),
+            ),
+        )
+
+        val viewModel = SettingsViewModel(CoroutineScope(Dispatchers.Unconfined), repository)
+
+        viewModel.toggleHotkey shouldBe Hotkey.DEFAULT_TOGGLE
+    }
+
+    @Test
     fun `view model auto-saves changes after debounce`() {
         val repository = createRepository()
         val viewModel = SettingsViewModel(CoroutineScope(Dispatchers.Unconfined), repository)
