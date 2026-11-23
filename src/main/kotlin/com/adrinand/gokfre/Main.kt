@@ -12,6 +12,8 @@ import com.adrinand.gokfre.core.hotkey.GlobalHotkeyProvider
 import com.adrinand.gokfre.core.logging.AppLogging
 import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
 import com.adrinand.gokfre.core.screen.ArrangementController
+import com.adrinand.gokfre.core.screen.LinuxRequirement
+import com.adrinand.gokfre.core.screen.LinuxRequirementChecker
 import com.adrinand.gokfre.core.screen.WindowManager
 import com.adrinand.gokfre.core.screen.createWindowManager
 import com.adrinand.gokfre.core.screen.isLinux
@@ -19,22 +21,27 @@ import com.adrinand.gokfre.core.startup.StartupLauncher
 import com.adrinand.gokfre.core.startup.createStartupLauncher
 import com.adrinand.gokfre.ui.GokfreTray
 import com.adrinand.gokfre.ui.GokfreWindow
-import com.adrinand.gokfre.ui.InputPermissionWarningDialog
+import com.adrinand.gokfre.ui.LinuxWarningWindow
 import com.adrinand.gokfre.ui.MacAccessibilityWarningWindow
 import com.adrinand.gokfre.ui.SettingsWindow
 import com.adrinand.gokfre.ui.createTrayIcon
+import com.adrinand.gokfre.ui.displayedRequirements
 import com.adrinand.gokfre.ui.globalHotkeyRegistration
 import com.adrinand.gokfre.ui.openAccessibilitySettings
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.logging.Level
 import java.util.logging.Logger
 import javax.swing.SwingUtilities
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.Main")
+
+private const val REQUIREMENT_RECHECK_DELAY_MS = 1_500L
 
 fun main() {
     AppLogging.initialize()
@@ -54,7 +61,7 @@ fun main() {
     runGokfreApplication(settingsRequestChannel)
 }
 
-@Suppress("LongMethod", "CognitiveComplexMethod", "LongParameterList")
+@Suppress("LongMethod", "CognitiveComplexMethod", "CyclomaticComplexMethod", "LongParameterList")
 fun runGokfreApplication(
     settingsRequestChannel: Channel<Unit>,
     exitProcessOnExit: Boolean = true,
@@ -65,6 +72,7 @@ fun runGokfreApplication(
     startupLauncher: StartupLauncher? = null,
     globalHotkeyProvider: GlobalHotkeyProvider? = null,
     toggleDispatcher: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
+    checkLinuxRequirements: Boolean = true,
 ) {
     val effectiveSettingsRepository =
         settingsRepository
@@ -91,8 +99,22 @@ fun runGokfreApplication(
         var arrangementController by remember { mutableStateOf<ArrangementController?>(null) }
         var isWindowVisible by remember { mutableStateOf(false) }
         var showSettings by remember { mutableStateOf(false) }
-        var showPermissionWarning by remember { mutableStateOf(false) }
+        var showMacAccessibilityWarning by remember { mutableStateOf(false) }
+        var linuxRequirements by remember { mutableStateOf<List<LinuxRequirement>>(emptyList()) }
+        var linuxRequirementsCheck by remember { mutableStateOf(0) }
+        var linuxHotkeyUnavailable by remember { mutableStateOf(false) }
         val trayIcon = remember { createTrayIcon() }
+
+        LaunchedEffect(linuxRequirementsCheck) {
+            if (checkLinuxRequirements && isLinux()) {
+                var detected = withContext(Dispatchers.IO) { LinuxRequirementChecker.missingRequirements() }
+                if (detected.isNotEmpty()) {
+                    delay(REQUIREMENT_RECHECK_DELAY_MS)
+                    detected = withContext(Dispatchers.IO) { LinuxRequirementChecker.missingRequirements() }
+                }
+                linuxRequirements = detected
+            }
+        }
 
         LaunchedEffect(Unit) {
             launch {
@@ -113,21 +135,32 @@ fun runGokfreApplication(
         }
 
         val toggleWindow = {
-            val controller = arrangementController
-            if (controller != null) {
-                if (!isWindowVisible) {
-                    controller.captureTargetWindow()
-                }
-                isWindowVisible = !isWindowVisible
-                logger.info("Preview window visible=$isWindowVisible")
+            if (linuxRequirements.isNotEmpty() || showMacAccessibilityWarning) {
+                logger.info { "Ignoring toggle while a setup warning is visible" }
             } else {
-                logger.info { "Window manager not ready yet, ignoring toggle" }
+                val controller = arrangementController
+                if (controller != null) {
+                    if (!isWindowVisible) {
+                        controller.captureTargetWindow()
+                    }
+                    isWindowVisible = !isWindowVisible
+                    logger.info("Preview window visible=$isWindowVisible")
+                } else {
+                    logger.info { "Window manager not ready yet, ignoring toggle" }
+                }
             }
         }
 
         globalHotkeyRegistration(
             settingsViewModel = settingsViewModel,
-            onPermissionMissing = { showPermissionWarning = true },
+            onPermissionMissing = {
+                if (isLinux()) {
+                    linuxHotkeyUnavailable = true
+                    linuxRequirementsCheck += 1
+                } else {
+                    showMacAccessibilityWarning = true
+                }
+            },
             onToggle = toggleWindow,
             globalHotkeyProvider = globalHotkeyProvider,
             toggleDispatcher = toggleDispatcher,
@@ -156,15 +189,19 @@ fun runGokfreApplication(
             )
         }
 
-        if (showPermissionWarning) {
-            if (isLinux()) {
-                InputPermissionWarningDialog(onDismiss = { showPermissionWarning = false })
-            } else {
-                MacAccessibilityWarningWindow(
-                    onDismiss = { showPermissionWarning = false },
-                    onOpenSystemSettings = ::openAccessibilitySettings,
-                )
-            }
+        if (isLinux()) {
+            LinuxWarningWindow(
+                requirements = displayedRequirements(linuxRequirements, linuxHotkeyUnavailable),
+                onDismiss = {
+                    linuxRequirements = emptyList()
+                    linuxHotkeyUnavailable = false
+                },
+            )
+        } else if (showMacAccessibilityWarning) {
+            MacAccessibilityWarningWindow(
+                onDismiss = { showMacAccessibilityWarning = false },
+                onOpenSystemSettings = ::openAccessibilitySettings,
+            )
         }
     }
 }

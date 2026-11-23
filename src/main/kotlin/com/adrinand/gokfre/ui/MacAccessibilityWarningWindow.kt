@@ -1,18 +1,6 @@
 package com.adrinand.gokfre.ui
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.rememberWindowState
 import java.util.logging.Logger
 
 private const val WINDOW_WIDTH_DP = 560
@@ -32,51 +20,36 @@ private const val INSTRUCTION_TEXT =
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.ui.MacAccessibilityWarningWindow")
 
+private val MAC_WARNING_CONTENT =
+    WarningContent(
+        windowTitle = WINDOW_TITLE,
+        sections =
+            listOf(
+                WarningSection(
+                    title = TITLE,
+                    lines =
+                        listOf(
+                            WarningLine(BODY_TEXT),
+                            WarningLine(INSTRUCTION_TEXT, WarningLineStyle.Emphasis),
+                        ),
+                ),
+            ),
+        actionLabel = SETTINGS_BUTTON_LABEL,
+        dismissLabel = DISMISS_BUTTON_LABEL,
+    )
+
 @Composable
 fun MacAccessibilityWarningWindow(
     onDismiss: () -> Unit,
     onOpenSystemSettings: () -> Unit,
 ) {
-    Window(
-        onCloseRequest = onDismiss,
-        title = WINDOW_TITLE,
-        state = rememberWindowState(width = WINDOW_WIDTH_DP.dp, height = WINDOW_HEIGHT_DP.dp),
-    ) {
-        MacAccessibilityWarningDialog(
-            onDismiss = onDismiss,
-            onOpenSystemSettings = onOpenSystemSettings,
-        )
-    }
-}
-
-@Composable
-fun MacAccessibilityWarningDialog(
-    onDismiss: () -> Unit,
-    onOpenSystemSettings: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Text(TITLE, style = MaterialTheme.typography.h6)
-        Text(
-            BODY_TEXT,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        Text(
-            INSTRUCTION_TEXT,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 12.dp),
-        )
-        Row(modifier = Modifier.padding(top = 16.dp)) {
-            Button(
-                onClick = onOpenSystemSettings,
-                modifier = Modifier.padding(end = 8.dp),
-            ) {
-                Text(SETTINGS_BUTTON_LABEL)
-            }
-            Button(onClick = onDismiss) {
-                Text(DISMISS_BUTTON_LABEL)
-            }
-        }
-    }
+    WarningWindow(
+        content = MAC_WARNING_CONTENT,
+        onDismiss = onDismiss,
+        onAction = onOpenSystemSettings,
+        widthDp = WINDOW_WIDTH_DP,
+        heightDp = WINDOW_HEIGHT_DP,
+    )
 }
 
 fun openAccessibilitySettings() {
