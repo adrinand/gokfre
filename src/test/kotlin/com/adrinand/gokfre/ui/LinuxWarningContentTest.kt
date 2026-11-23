@@ -34,22 +34,6 @@ class LinuxWarningContentTest {
     }
 
     @Test
-    fun `hotkey failure adds a listener warning`() {
-        displayedRequirements(
-            detected = emptyList(),
-            hotkeyUnavailable = true,
-        ) shouldContainExactly listOf(LinuxRequirement.HOTKEY_LISTENER)
-    }
-
-    @Test
-    fun `hotkey failure does not duplicate the input warning`() {
-        displayedRequirements(
-            detected = listOf(LinuxRequirement.INPUT_DEVICE_ACCESS),
-            hotkeyUnavailable = true,
-        ) shouldContainExactly listOf(LinuxRequirement.INPUT_DEVICE_ACCESS)
-    }
-
-    @Test
     fun `input device section explains groups and command`() {
         val section = linuxWarningContent(listOf(LinuxRequirement.INPUT_DEVICE_ACCESS)).sections.single()
         val lines = section.lines.map { it.text }

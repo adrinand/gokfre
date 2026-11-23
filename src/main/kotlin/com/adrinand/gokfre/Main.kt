@@ -1,6 +1,7 @@
 package com.adrinand.gokfre
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,14 +26,12 @@ import com.adrinand.gokfre.ui.LinuxWarningWindow
 import com.adrinand.gokfre.ui.MacAccessibilityWarningWindow
 import com.adrinand.gokfre.ui.SettingsWindow
 import com.adrinand.gokfre.ui.createTrayIcon
-import com.adrinand.gokfre.ui.displayedRequirements
 import com.adrinand.gokfre.ui.globalHotkeyRegistration
 import com.adrinand.gokfre.ui.openAccessibilitySettings
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.logging.Level
@@ -40,8 +39,6 @@ import java.util.logging.Logger
 import javax.swing.SwingUtilities
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.Main")
-
-private const val REQUIREMENT_RECHECK_DELAY_MS = 1_500L
 
 fun main() {
     AppLogging.initialize()
@@ -101,18 +98,30 @@ fun runGokfreApplication(
         var showSettings by remember { mutableStateOf(false) }
         var showMacAccessibilityWarning by remember { mutableStateOf(false) }
         var linuxRequirements by remember { mutableStateOf<List<LinuxRequirement>>(emptyList()) }
-        var linuxRequirementsCheck by remember { mutableStateOf(0) }
+        var linuxRequirementsChecked by remember { mutableStateOf(!checkLinuxRequirements || !isLinux()) }
         var linuxHotkeyUnavailable by remember { mutableStateOf(false) }
         val trayIcon = remember { createTrayIcon() }
 
-        LaunchedEffect(linuxRequirementsCheck) {
+        LaunchedEffect(Unit) {
             if (checkLinuxRequirements && isLinux()) {
-                var detected = withContext(Dispatchers.IO) { LinuxRequirementChecker.missingRequirements() }
-                if (detected.isNotEmpty()) {
-                    delay(REQUIREMENT_RECHECK_DELAY_MS)
-                    detected = withContext(Dispatchers.IO) { LinuxRequirementChecker.missingRequirements() }
+                linuxRequirements =
+                    withContext(Dispatchers.IO) {
+                        LinuxRequirementChecker.checkMissingRequirementsWithRetry()
+                    }
+                linuxRequirementsChecked = true
+            }
+        }
+
+        val warningRequirements by remember {
+            derivedStateOf {
+                if (!linuxRequirementsChecked) {
+                    emptyList()
+                } else {
+                    LinuxRequirementChecker.displayedRequirements(
+                        detected = linuxRequirements,
+                        hotkeyListenerFailed = linuxHotkeyUnavailable,
+                    )
                 }
-                linuxRequirements = detected
             }
         }
 
@@ -134,8 +143,10 @@ fun runGokfreApplication(
             settingsRequestChannel.consumeEach { showSettings = true }
         }
 
+        fun isSetupWarningVisible(): Boolean = warningRequirements.isNotEmpty() || showMacAccessibilityWarning
+
         val toggleWindow = {
-            if (linuxRequirements.isNotEmpty() || showMacAccessibilityWarning) {
+            if (isSetupWarningVisible()) {
                 logger.info { "Ignoring toggle while a setup warning is visible" }
             } else {
                 val controller = arrangementController
@@ -156,7 +167,6 @@ fun runGokfreApplication(
             onPermissionMissing = {
                 if (isLinux()) {
                     linuxHotkeyUnavailable = true
-                    linuxRequirementsCheck += 1
                 } else {
                     showMacAccessibilityWarning = true
                 }
@@ -191,7 +201,7 @@ fun runGokfreApplication(
 
         if (isLinux()) {
             LinuxWarningWindow(
-                requirements = displayedRequirements(linuxRequirements, linuxHotkeyUnavailable),
+                requirements = warningRequirements,
                 onDismiss = {
                     linuxRequirements = emptyList()
                     linuxHotkeyUnavailable = false

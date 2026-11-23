@@ -31,15 +31,5 @@ internal fun linuxWarningContent(requirements: List<LinuxRequirement>): WarningC
         sections = requirements.map(::warningSection),
     )
 
-internal fun displayedRequirements(
-    detected: List<LinuxRequirement>,
-    hotkeyUnavailable: Boolean,
-): List<LinuxRequirement> =
-    if (hotkeyUnavailable && LinuxRequirement.INPUT_DEVICE_ACCESS !in detected) {
-        detected + LinuxRequirement.HOTKEY_LISTENER
-    } else {
-        detected
-    }
-
 private fun windowHeightDp(content: WarningContent): Int =
     (BASE_WINDOW_HEIGHT_DP + content.sections.size * SECTION_HEIGHT_DP).coerceAtMost(MAX_WINDOW_HEIGHT_DP)
