@@ -156,7 +156,6 @@ fun runGokfreApplication(
             }
         }
 
-
         globalHotkeyRegistration(
             settingsViewModel = settingsViewModel,
             onPermissionMissing = {
