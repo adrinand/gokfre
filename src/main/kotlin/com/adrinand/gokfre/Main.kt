@@ -69,7 +69,6 @@ fun runGokfreApplication(
     startupLauncher: StartupLauncher? = null,
     globalHotkeyProvider: GlobalHotkeyProvider? = null,
     toggleDispatcher: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
-    checkLinuxRequirements: Boolean = true,
 ) {
     val effectiveSettingsRepository =
         settingsRepository
@@ -98,12 +97,12 @@ fun runGokfreApplication(
         var showSettings by remember { mutableStateOf(false) }
         var showMacAccessibilityWarning by remember { mutableStateOf(false) }
         var linuxRequirements by remember { mutableStateOf<List<LinuxRequirement>>(emptyList()) }
-        var linuxRequirementsChecked by remember { mutableStateOf(!checkLinuxRequirements || !isLinux()) }
+        var linuxRequirementsChecked by remember { mutableStateOf(!isLinux()) }
         var linuxHotkeyUnavailable by remember { mutableStateOf(false) }
         val trayIcon = remember { createTrayIcon() }
 
         LaunchedEffect(Unit) {
-            if (checkLinuxRequirements && isLinux()) {
+            if (isLinux()) {
                 linuxRequirements =
                     withContext(Dispatchers.IO) {
                         LinuxRequirementChecker.checkMissingRequirementsWithRetry()

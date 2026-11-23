@@ -19,7 +19,7 @@ window.
   hotkeys.
 - **D-Bus:** `dbus-java` (core + native unixsocket transport) is used on KDE to
   host the bridge KWin scripts report through.
-- **Testing:** Kotest + JUnit 4 (Compose UI tests via `createComposeRule`),
+- **Testing:** Kotest + JUnit 4 + MockK (Compose UI tests via `createComposeRule`),
   plus real-desktop E2E tests under `src/e2e/kotlin`.
 
 ## Project layout

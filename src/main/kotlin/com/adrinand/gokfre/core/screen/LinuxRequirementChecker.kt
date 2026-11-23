@@ -21,7 +21,7 @@ private val GNOME_APPINDICATOR_UUIDS =
         "appindicatorsupport@rgcjonas.gmail.com",
     )
 private val EXTENSION_STATE_REGEX = Regex("""'state':\s*<(?:\w+\s+)?(\d+)(?:\.\d+)?>""")
-private const val REQUIREMENT_RECHECK_DELAY_MS = 1_500L
+private const val RECHECK_DELAY_MS = 1_500L
 
 enum class LinuxRequirement {
     INPUT_DEVICE_ACCESS,
@@ -63,44 +63,10 @@ object LinuxRequirementChecker {
         if (!session.isLinux) {
             return emptyList()
         }
-        return missingRequirements(session, detectProbe(session))
-    }
 
-    /**
-     * Re-probes when the first pass finds something: GNOME extensions can still be
-     * starting at login and would otherwise report false positives.
-     */
-    internal suspend fun checkMissingRequirementsWithRetry(
-        recheckDelayMs: Long = REQUIREMENT_RECHECK_DELAY_MS,
-        probe: () -> List<LinuxRequirement> = { missingRequirements() },
-    ): List<LinuxRequirement> {
-        val first = probe()
-        if (first.isEmpty()) {
-            return emptyList()
-        }
-        delay(recheckDelayMs.milliseconds)
-        return probe()
-    }
-
-    /** Adds the listener warning unless missing input access already explains the failure. */
-    internal fun displayedRequirements(
-        detected: List<LinuxRequirement>,
-        hotkeyListenerFailed: Boolean,
-    ): List<LinuxRequirement> =
-        if (hotkeyListenerFailed && LinuxRequirement.INPUT_DEVICE_ACCESS !in detected) {
-            detected + LinuxRequirement.HOTKEY_LISTENER
-        } else {
-            detected
-        }
-
-    internal fun missingRequirements(
-        session: LinuxSession,
-        probe: LinuxProbe,
-    ): List<LinuxRequirement> {
-        if (!session.isLinux) {
-            return emptyList()
-        }
+        val probe = detectProbe(session)
         val requirements = mutableListOf<LinuxRequirement>()
+
         if (!probe.hasInputAccess) {
             requirements += LinuxRequirement.INPUT_DEVICE_ACCESS
         }
@@ -112,6 +78,25 @@ object LinuxRequirementChecker {
         }
         return requirements
     }
+
+    internal suspend fun checkMissingRequirementsWithRetry(delayMs: Long = RECHECK_DELAY_MS): List<LinuxRequirement> {
+        val first = missingRequirements()
+        if (first.isEmpty()) {
+            return emptyList()
+        }
+        delay(delayMs.milliseconds)
+        return missingRequirements()
+    }
+
+    internal fun displayedRequirements(
+        detected: List<LinuxRequirement>,
+        hotkeyListenerFailed: Boolean,
+    ): List<LinuxRequirement> =
+        if (hotkeyListenerFailed && LinuxRequirement.INPUT_DEVICE_ACCESS !in detected) {
+            detected + LinuxRequirement.HOTKEY_LISTENER
+        } else {
+            detected
+        }
 
     private fun collectGnomeRequirements(
         session: LinuxSession,
