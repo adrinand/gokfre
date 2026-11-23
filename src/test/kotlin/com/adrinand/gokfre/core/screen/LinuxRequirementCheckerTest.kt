@@ -20,13 +20,13 @@ private const val KDE = "KDE"
 private const val SWAY = "sway"
 private const val CURRENT_SESSION = "currentSession"
 private const val DETECT_PROBE = "detectProbe"
-private val defaultProbe = LinuxProbe(true, true, true, true)
+private val defaultProbe = LinuxRequirementsProbe(true, true, true, true)
 
 private fun linuxSession(
     osName: String = LINUX,
     sessionType: String = WAYLAND,
     desktop: String = GNOME,
-): LinuxSession = LinuxSession(osName = osName, sessionType = sessionType, desktop = desktop)
+): LinuxSessionData = LinuxSessionData(osName = osName, sessionType = sessionType, desktop = desktop)
 
 class LinuxRequirementCheckerTest {
     @Before
@@ -37,7 +37,7 @@ class LinuxRequirementCheckerTest {
         mockkObject(LinuxRequirementChecker, recordPrivateCalls = true)
         every { LinuxRequirementChecker.missingRequirements() } answers { callOriginal() }
         every { LinuxRequirementChecker[CURRENT_SESSION]() } returns linuxSession()
-        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSession>()) } returns defaultProbe
+        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSessionData>()) } returns defaultProbe
     }
 
     @After
@@ -62,7 +62,7 @@ class LinuxRequirementCheckerTest {
     @Test
     fun `missing input access is reported`() {
         every { LinuxRequirementChecker[CURRENT_SESSION]() } returns linuxSession(sessionType = X11, desktop = GNOME)
-        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSession>()) } returns
+        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSessionData>()) } returns
             defaultProbe.copy(hasInputAccess = false)
 
         LinuxRequirementChecker.missingRequirements() shouldContainExactly listOf(LinuxRequirement.INPUT_DEVICE_ACCESS)
@@ -70,7 +70,7 @@ class LinuxRequirementCheckerTest {
 
     @Test
     fun `missing GNOME Shell extension on Wayland is reported`() {
-        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSession>()) } returns
+        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSessionData>()) } returns
             defaultProbe.copy(hasGnomeExtension = false)
 
         LinuxRequirementChecker.missingRequirements() shouldContainExactly
@@ -79,7 +79,7 @@ class LinuxRequirementCheckerTest {
 
     @Test
     fun `missing AppIndicator extension on GNOME is reported`() {
-        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSession>()) } returns
+        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSessionData>()) } returns
             defaultProbe.copy(hasAppIndicator = false)
 
         LinuxRequirementChecker.missingRequirements() shouldContainExactly
@@ -88,7 +88,7 @@ class LinuxRequirementCheckerTest {
 
     @Test
     fun `missing gdbus on GNOME reports only the D-Bus client`() {
-        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSession>()) } returns
+        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSessionData>()) } returns
             defaultProbe.copy(hasGdbus = false, hasGnomeExtension = false, hasAppIndicator = false)
 
         LinuxRequirementChecker.missingRequirements() shouldContainExactly listOf(LinuxRequirement.DBUS_CLIENT)
@@ -97,7 +97,7 @@ class LinuxRequirementCheckerTest {
     @Test
     fun `KDE Wayland needs nothing beyond input access`() {
         every { LinuxRequirementChecker[CURRENT_SESSION]() } returns linuxSession(desktop = KDE)
-        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSession>()) } returns
+        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSessionData>()) } returns
             defaultProbe.copy(hasGnomeExtension = false, hasAppIndicator = false)
 
         LinuxRequirementChecker.missingRequirements().shouldBeEmpty()
@@ -106,7 +106,7 @@ class LinuxRequirementCheckerTest {
     @Test
     fun `unsupported Wayland compositor is reported`() {
         every { LinuxRequirementChecker[CURRENT_SESSION]() } returns linuxSession(desktop = SWAY)
-        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSession>()) } returns
+        every { LinuxRequirementChecker[DETECT_PROBE](any<LinuxSessionData>()) } returns
             defaultProbe.copy(hasGnomeExtension = false, hasAppIndicator = false)
 
         LinuxRequirementChecker.missingRequirements() shouldContainExactly

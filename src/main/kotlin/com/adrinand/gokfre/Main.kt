@@ -89,9 +89,6 @@ fun runGokfreApplication(
             remember {
                 SettingsViewModel(settingsCoroutineScope, effectiveSettingsRepository, effectiveStartupLauncher)
             }
-        LaunchedEffect(settingsViewModel) {
-            onViewModelCreated(settingsViewModel)
-        }
         var windowManager by remember { mutableStateOf<WindowManager?>(null) }
         var arrangementController by remember { mutableStateOf<ArrangementController?>(null) }
         var isWindowVisible by remember { mutableStateOf(false) }
@@ -100,6 +97,20 @@ fun runGokfreApplication(
         var linuxRequirements by remember { mutableStateOf<List<LinuxRequirement>?>(null) }
         var linuxHotkeyUnavailable by remember { mutableStateOf(false) }
         val trayIcon = remember { createTrayIcon() }
+        val linuxMissingRequirements by remember {
+            derivedStateOf {
+                linuxRequirements?.let {
+                    LinuxRequirementChecker.displayeMissingdRequirements(
+                        detected = it,
+                        hotkeyListenerFailed = linuxHotkeyUnavailable,
+                    )
+                } ?: emptyList()
+            }
+        }
+
+        LaunchedEffect(settingsViewModel) {
+            onViewModelCreated(settingsViewModel)
+        }
 
         LaunchedEffect(Unit) {
             if (isLinux() && !e2eMode) {
@@ -107,17 +118,6 @@ fun runGokfreApplication(
                     withContext(Dispatchers.IO) {
                         LinuxRequirementChecker.checkMissingRequirementsWithRetry()
                     }
-            }
-        }
-
-        val warningRequirements by remember {
-            derivedStateOf {
-                linuxRequirements?.let {
-                    LinuxRequirementChecker.displayedRequirements(
-                        detected = it,
-                        hotkeyListenerFailed = linuxHotkeyUnavailable,
-                    )
-                } ?: emptyList()
             }
         }
 
@@ -139,10 +139,8 @@ fun runGokfreApplication(
             settingsRequestChannel.consumeEach { showSettings = true }
         }
 
-        fun isSetupWarningVisible(): Boolean = warningRequirements.isNotEmpty() || showMacAccessibilityWarning
-
         val toggleWindow = {
-            if (isSetupWarningVisible()) {
+            if (linuxMissingRequirements.isNotEmpty() || showMacAccessibilityWarning) {
                 logger.info { "Ignoring toggle while a setup warning is visible" }
             } else {
                 val controller = arrangementController
@@ -157,6 +155,7 @@ fun runGokfreApplication(
                 }
             }
         }
+
 
         globalHotkeyRegistration(
             settingsViewModel = settingsViewModel,
@@ -195,9 +194,9 @@ fun runGokfreApplication(
             )
         }
 
-        if (isLinux()) {
+        if (isLinux() && linuxMissingRequirements.isNotEmpty()) {
             LinuxWarningWindow(
-                requirements = warningRequirements,
+                requirements = linuxMissingRequirements,
                 onDismiss = {
                     linuxRequirements = emptyList()
                     linuxHotkeyUnavailable = false

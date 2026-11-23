@@ -32,7 +32,7 @@ enum class LinuxRequirement {
     UNSUPPORTED_WAYLAND_COMPOSITOR,
 }
 
-internal data class LinuxSession(
+internal data class LinuxSessionData(
     val osName: String?,
     val sessionType: String,
     val desktop: String,
@@ -46,14 +46,13 @@ internal data class LinuxSession(
     val isUnsupportedWayland: Boolean get() = isWayland && !isSupportedDesktop
 }
 
-internal data class LinuxProbe(
+internal data class LinuxRequirementsProbe(
     val hasInputAccess: Boolean,
     val hasGdbus: Boolean,
     val hasGnomeExtension: Boolean,
     val hasAppIndicator: Boolean,
 )
 
-/** Detects missing Linux requirements. Spawns `id` and `gdbus`, so call off the UI thread. */
 object LinuxRequirementChecker {
     fun missingRequirements(): List<LinuxRequirement> {
         if (GraphicsEnvironment.isHeadless()) {
@@ -74,7 +73,7 @@ object LinuxRequirementChecker {
             requirements += LinuxRequirement.UNSUPPORTED_WAYLAND_COMPOSITOR
         }
         if (session.isGnome) {
-            collectGnomeRequirements(session, probe, requirements)
+            gnomeMissingRequirements(session, probe, requirements)
         }
         return requirements
     }
@@ -88,7 +87,7 @@ object LinuxRequirementChecker {
         return missingRequirements()
     }
 
-    internal fun displayedRequirements(
+    internal fun displayeMissingdRequirements(
         detected: List<LinuxRequirement>,
         hotkeyListenerFailed: Boolean,
     ): List<LinuxRequirement> =
@@ -98,9 +97,9 @@ object LinuxRequirementChecker {
             detected
         }
 
-    private fun collectGnomeRequirements(
-        session: LinuxSession,
-        probe: LinuxProbe,
+    private fun gnomeMissingRequirements(
+        session: LinuxSessionData,
+        probe: LinuxRequirementsProbe,
         requirements: MutableList<LinuxRequirement>,
     ) {
         if (!probe.hasGdbus) {
@@ -115,23 +114,23 @@ object LinuxRequirementChecker {
         }
     }
 
-    private fun currentSession(): LinuxSession {
+    private fun currentSession(): LinuxSessionData {
         val sessionType =
             System.getenv("XDG_SESSION_TYPE")?.lowercase()?.takeIf { it.isNotEmpty() }
                 ?: if (System.getenv("WAYLAND_DISPLAY").isNullOrEmpty()) "x11" else WAYLAND_SESSION
         val desktop =
             System.getenv("XDG_CURRENT_DESKTOP")?.takeIf { it.isNotEmpty() }
                 ?: System.getenv("DESKTOP_SESSION").orEmpty()
-        return LinuxSession(
+        return LinuxSessionData(
             osName = System.getProperty("os.name"),
             sessionType = sessionType,
             desktop = desktop,
         )
     }
 
-    private fun detectProbe(session: LinuxSession): LinuxProbe {
+    private fun detectProbe(session: LinuxSessionData): LinuxRequirementsProbe {
         val gdbus = Dbus.findGdbus()
-        return LinuxProbe(
+        return LinuxRequirementsProbe(
             hasInputAccess = runCatching { InputDevicePermissionChecker.hasInputDeviceAccess() }.getOrDefault(false),
             hasGdbus = gdbus != null,
             hasGnomeExtension = gdbus != null && session.isGnome && isGnomeExtensionRunning(gdbus),

@@ -8,15 +8,11 @@ private const val BASE_WINDOW_HEIGHT_DP = 180
 private const val SECTION_HEIGHT_DP = 140
 private const val MAX_WINDOW_HEIGHT_DP = 640
 
-/** Shows setup warnings for missing Linux requirements; renders nothing otherwise. */
 @Composable
 fun LinuxWarningWindow(
     requirements: List<LinuxRequirement>,
     onDismiss: () -> Unit,
 ) {
-    if (requirements.isEmpty()) {
-        return
-    }
     val content = linuxWarningContent(requirements)
     WarningWindow(
         content = content,
