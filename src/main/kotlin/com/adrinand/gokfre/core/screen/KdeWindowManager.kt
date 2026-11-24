@@ -13,7 +13,6 @@ private const val BACKEND_NAME = "kwin"
 private const val POLL_INTERVAL_MS = 50L
 private const val MAXIMIZE_SETTLE_MS = 50L
 private const val POLL_TIMEOUT_MS = 2_000L
-private const val BACKGROUND_CAPTURE_INTERVAL_MS = 1_000L
 
 private data class CapturedWindow(
     val id: String,
@@ -25,8 +24,6 @@ private data class CapturedWindow(
  */
 class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.KdeWindowManager")
-
-    override val backgroundCaptureIntervalMs: Long = BACKGROUND_CAPTURE_INTERVAL_MS
 
     @Volatile
     private var capturedWindow: CapturedWindow? = null

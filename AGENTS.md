@@ -163,13 +163,21 @@ session bus. Design notes live here instead of in code comments.
 
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and
   Compose focus. Make it focusable before mapping (`Window(focusable = true)`,
-  `alwaysOnTop = visible`), focus it right after `isShowing`, then re-assert
-  focus after placement. Placement/maximize must never gate keyboard focus.
+  `alwaysOnTop = visible`). On show, finish backend placement while the window is
+  still transparent, then reveal immediately and run focus in the background; the
+  100 ms fade-in masks the ~60 ms handoff, so the preview never waits on focus
+  confirmation. Placement/maximize must never gate an already visible window.
+- **Target capture:** capture the active window once per open on
+  `Dispatchers.IO` before the preview is shown, with a short timeout; if it
+  fails, still show the preview and keep the previous target. Do not poll the
+  active window in the background: it costs IPC and can capture gokfre's own
+  preview.
 - On GNOME, `FocusPreview` uses `Main.activateWindow` with a roundtrip timestamp
-  and returns `preview.has_focus()`; the app retries for ~500 ms before falling
-  back to AWT. Shell-side activation is required because `arrange()` just
-  activated the target app, so Mutter's focus-stealing prevention blocks AWT
-  activation; do not call AWT `toFront()`/`requestFocus()` after it.
+  and returns `preview.has_focus()`; the app retries for ~500 ms in the
+  background before falling back to AWT. Shell-side activation is required
+  because `arrange()` just activated the target app, so Mutter's focus-stealing
+  prevention blocks AWT activation; do not call AWT `toFront()`/`requestFocus()`
+  after it.
 - **Coordinate spaces:** AWT/XWayland can report native pixels when JVM UI scaling
   is off (common in E2E), while GNOME and KWin compositor APIs use logical
   coordinates. `WindowManager.getWorkArea(window, bounds)` must return the

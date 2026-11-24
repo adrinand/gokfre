@@ -10,14 +10,6 @@ import java.awt.Window
 @Suppress("ComplexInterface")
 interface WindowManager {
     /**
-     * How often the target window is refreshed while the preview is closed.
-     *
-     * Backends that capture with expensive IPC (GNOME/KDE) override this.
-     */
-    val backgroundCaptureIntervalMs: Long
-        get() = DEFAULT_BACKGROUND_CAPTURE_INTERVAL_MS
-
-    /**
      * Returns a platform-specific handle for the currently active window,
      * or `null` if it cannot be determined.
      */
@@ -102,9 +94,5 @@ interface WindowManager {
     suspend fun focusPreview(window: Window) {
         window.toFront()
         window.requestFocus()
-    }
-
-    companion object {
-        const val DEFAULT_BACKGROUND_CAPTURE_INTERVAL_MS = 250L
     }
 }

@@ -59,7 +59,7 @@ private const val MAX_SELECTED_KEYS = 2
 private const val PREVIEW_OFFSCREEN_COORDINATE = -100_000
 private const val PREVIEW_HIDDEN_SIZE_DP = 1
 
-@Suppress("TooGenericExceptionCaught")
+@Suppress("TooGenericExceptionCaught", "ThrowsCount")
 @Composable
 fun GokfreWindow(
     visible: Boolean,
@@ -207,7 +207,6 @@ fun GokfreWindow(
         if (!visible) {
             logger.info { "LaunchedEffect: hiding preview" }
             previewReady = false
-            win.isResizable = false
             win.setOpacitySafely(0f)
             return@LaunchedEffect
         }
@@ -227,18 +226,34 @@ fun GokfreWindow(
         val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
         val sameMonitor = lastWorkArea == workArea
         if (!sameMonitor) {
-            win.bounds = workArea
+            // Finish the restore/move/maximize sequence before the fade-in so
+            // the intermediate states are never visible.
+            win.isResizable = true
+            try {
+                win.bounds = workArea
+                val placed =
+                    arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+                lastWorkArea = if (placed) workArea else null
+            } catch (e: CancellationException) {
+                lastWorkArea = null
+                throw e
+            } catch (e: Exception) {
+                lastWorkArea = null
+                logger.warning { "Preview placement failed: ${e.message}" }
+            } finally {
+                win.isResizable = false
+            }
         }
-        win.isResizable = true
-        try {
-            // Focus stays on the critical path so the first keystroke reaches the
-            // preview; placement and maximizing can finish in the background.
-            arrangementController.windowManager.focusPreview(win)
-        } catch (e: CancellationException) {
-            win.isResizable = false
-            throw e
-        } catch (e: Exception) {
-            logger.warning { "Preview focus failed: ${e.message}" }
+        // The focus handoff can take tens of ms on Wayland, so it runs in the
+        // background while the 100 ms fade-in masks it.
+        launch {
+            try {
+                arrangementController.windowManager.focusPreview(win)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warning { "Preview focus failed: ${e.message}" }
+            }
         }
         if (!isLinux()) {
             focusAppWindow()
@@ -248,26 +263,15 @@ fun GokfreWindow(
         win.setOpacitySafely(1f)
         runCatching { focusRequester.requestFocus() }
             .onFailure { logger.warning { "re-request focus failed: $it" } }
-
-        launch {
-            try {
-                if (sameMonitor) {
-                    val maximized =
-                        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-                    lastWorkArea = if (maximized) workArea else null
-                } else {
-                    val placed =
-                        arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
-                    lastWorkArea = if (placed) workArea else null
+        if (sameMonitor) {
+            launch {
+                try {
+                    arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.warning { "Preview maximize failed: ${e.message}" }
                 }
-            } catch (e: CancellationException) {
-                lastWorkArea = null
-                throw e
-            } catch (e: Exception) {
-                lastWorkArea = null
-                logger.warning { "Preview placement failed: ${e.message}" }
-            } finally {
-                win.isResizable = false
             }
         }
     }

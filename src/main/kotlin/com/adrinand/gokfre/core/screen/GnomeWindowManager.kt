@@ -21,7 +21,6 @@ private const val MAXIMIZE_SETTLE_MS = 50L
 private const val CALL_TIMEOUT_MS = 300L
 private const val FOCUS_CALL_TIMEOUT_MS = 1_000L
 private const val FOCUS_RETRY_TIMEOUT_MS = 500L
-private const val BACKGROUND_CAPTURE_INTERVAL_MS = 500L
 private const val PLACE_PREVIEW_ATTEMPTS = 5
 private const val BOUNDS_VALUE_COUNT = 4
 private const val X_INDEX = 0
@@ -67,8 +66,6 @@ internal fun parseCapturedWorkArea(output: String): Rectangle? {
 @Suppress("TooManyFunctions")
 class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.GnomeWindowManager")
-
-    override val backgroundCaptureIntervalMs: Long = BACKGROUND_CAPTURE_INTERVAL_MS
 
     @Volatile
     private var capturedWorkArea: Rectangle? = null
