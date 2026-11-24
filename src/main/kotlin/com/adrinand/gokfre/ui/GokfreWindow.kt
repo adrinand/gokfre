@@ -254,11 +254,14 @@ fun GokfreWindow(
             logger.info { "Preview bounds drifted to ${win.bounds}; restoring $awtWorkArea" }
             win.bounds = awtWorkArea
         }
+        val windowManager = arrangementController.windowManager
         // The focus handoff can take tens of ms on Wayland, so it runs in the
         // background while the 100 ms fade-in masks it.
         launch {
+            val started = TimeSource.Monotonic.markNow()
             try {
-                arrangementController.windowManager.focusPreview(win)
+                windowManager.focusPreview(win)
+                logger.info { "Preview focus elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -274,20 +277,23 @@ fun GokfreWindow(
         runCatching { focusRequester.requestFocus() }
             .onFailure { logger.warning { "re-request focus failed: $it" } }
         if (sameMonitor) {
-            launch {
-                val started = TimeSource.Monotonic.markNow()
-                try {
-                    val maximized =
-                        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-                    if (!maximized) {
-                        logger.info { "Preview was not maximized after re-asserting maximize" }
+            if (windowManager.keepsPreviewMaximizedWhenHidden) {
+                logger.info { "Preview maximize skipped; window stays maximized while hidden" }
+            } else {
+                launch {
+                    val started = TimeSource.Monotonic.markNow()
+                    try {
+                        val maximized = windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+                        if (!maximized) {
+                            logger.info { "Preview was not maximized after re-asserting maximize" }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.warning { "Preview maximize failed: ${e.message}" }
+                    } finally {
+                        logger.info { "Preview maximize elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    logger.warning { "Preview maximize failed: ${e.message}" }
-                } finally {
-                    logger.info { "Preview maximize elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
                 }
             }
         }

@@ -10,6 +10,13 @@ import java.awt.Window
 @Suppress("ComplexInterface")
 interface WindowManager {
     /**
+     * Whether a hidden preview keeps its maximized state, so re-asserting it on
+     * every open only costs a backend round-trip.
+     */
+    val keepsPreviewMaximizedWhenHidden: Boolean
+        get() = false
+
+    /**
      * Returns a platform-specific handle for the currently active window,
      * or `null` if it cannot be determined.
      */

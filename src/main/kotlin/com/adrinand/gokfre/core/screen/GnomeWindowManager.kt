@@ -68,6 +68,10 @@ internal fun parseCapturedWorkArea(output: String): Rectangle? {
 class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.GnomeWindowManager")
 
+    // Mutter keeps a hidden maximized window maximized, so the same-monitor
+    // re-assert only costs a D-Bus round-trip.
+    override val keepsPreviewMaximizedWhenHidden: Boolean = true
+
     @Volatile
     private var capturedWorkArea: Rectangle? = null
 
