@@ -1,5 +1,7 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.awt.Rectangle
 import java.awt.Window
 import java.util.logging.Logger
@@ -46,7 +48,7 @@ class MacWindowManager internal constructor(
     }
 
     override suspend fun focusPreview(window: Window) {
-        focusAppWindow()
+        withContext(Dispatchers.IO) { focusAppWindow() }
         super.focusPreview(window)
     }
 
