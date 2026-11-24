@@ -45,6 +45,7 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.ui.GokfreWindow")
 
@@ -225,6 +226,10 @@ fun GokfreWindow(
         }
         val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
         val sameMonitor = lastWorkArea == workArea
+        val awtWorkArea = win.workAreaBounds()
+        logger.info {
+            "Preview show sameMonitor=$sameMonitor bounds=${win.bounds} awtWorkArea=$awtWorkArea"
+        }
         if (!sameMonitor) {
             // Finish the restore/move/maximize sequence before the fade-in so
             // the intermediate states are never visible.
@@ -243,6 +248,11 @@ fun GokfreWindow(
             } finally {
                 win.isResizable = false
             }
+        } else if (win.bounds != awtWorkArea) {
+            // A hidden window can lose its bounds; restore them before reveal
+            // so it never grows from the off-screen placeholder.
+            logger.info { "Preview bounds drifted to ${win.bounds}; restoring $awtWorkArea" }
+            win.bounds = awtWorkArea
         }
         // The focus handoff can take tens of ms on Wayland, so it runs in the
         // background while the 100 ms fade-in masks it.
@@ -265,12 +275,19 @@ fun GokfreWindow(
             .onFailure { logger.warning { "re-request focus failed: $it" } }
         if (sameMonitor) {
             launch {
+                val started = TimeSource.Monotonic.markNow()
                 try {
-                    arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+                    val maximized =
+                        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+                    if (!maximized) {
+                        logger.info { "Preview was not maximized after re-asserting maximize" }
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     logger.warning { "Preview maximize failed: ${e.message}" }
+                } finally {
+                    logger.info { "Preview maximize elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
                 }
             }
         }
