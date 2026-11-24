@@ -17,6 +17,7 @@ import java.util.logging.Logger
  * Reads the active window from the `_NET_ACTIVE_WINDOW` root property and
  * applies bounds with [X11Extra.XMoveResizeWindow].
  */
+@Suppress("TooManyFunctions")
 object X11WindowManager : SingleBackendWindowManager<WindowHandle.X11>() {
     override val logger = Logger.getLogger("com.adrinand.gokfre.core.screen.X11WindowManager")
 
@@ -119,6 +120,12 @@ object X11WindowManager : SingleBackendWindowManager<WindowHandle.X11>() {
             x11.XFlush(display)
         } finally {
             x11.XCloseDisplay(display)
+        }
+    }
+
+    override fun configurePreviewWindow(window: Window) {
+        if (isX11Session()) {
+            window.skipTaskbarX11()
         }
     }
 

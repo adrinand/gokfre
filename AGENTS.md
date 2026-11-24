@@ -161,6 +161,13 @@ session bus. Design notes live here instead of in code comments.
 
 ### Preview focus and work areas
 
+- **Show-path ownership:** `GokfreWindow` only manages Compose state (fade,
+  key selection, focus requester). `WindowManager.showPreview` owns monitor
+  tracking, placement, the bounds-drift guard, and the same-monitor maximize
+  decision. `keepsPreviewMaximizedWhenHidden` is true on GNOME/KDE/macOS and false
+  on X11. Platform quirks stay in backends: X11 configures the taskbar hint,
+  macOS activates the app before AWT focus, and Linux ties `alwaysOnTop` to
+  visibility.
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and
   Compose focus. Make it focusable before mapping (`Window(focusable = true)`,
   `alwaysOnTop = visible`). On show, finish backend placement while the window is
@@ -188,8 +195,8 @@ session bus. Design notes live here instead of in code comments.
   maximized on the previous monitor. Capture the logical work area in the same
   `CaptureActiveWindow` call to avoid an extra blocking `gdbus` call. Older
   extensions without logical work areas use client-side AWT placement instead.
-- Only record the preview's monitor after placement succeeds; a failed move must
-  be retried on the next open.
+- `WindowManager.showPreview` records the preview's monitor only after placement
+  succeeds; a failed move must be retried on the next open.
 - **Extension reloads:** GNOME Shell 45+ caches `extension.js`; disabling/enabling
   or `ReloadExtension` does not reload it. Log out/in after changing the GNOME
   extension before testing new D-Bus methods. Older extensions may lack

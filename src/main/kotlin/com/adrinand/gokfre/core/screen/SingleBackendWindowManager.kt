@@ -1,7 +1,15 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import java.awt.Frame
 import java.awt.Rectangle
+import java.awt.Window
 import java.util.logging.Logger
+import kotlin.time.TimeSource
+
+private const val PREVIEW_TIMEOUT_MS = 2_000L
 
 /**
  * Base class for [WindowManager] implementations that manage a single backend
@@ -11,8 +19,11 @@ import java.util.logging.Logger
  * [WindowHandle] type. The base class centralises the cast and the warning
  * logged when an incompatible handle is passed in.
  */
+@Suppress("TooManyFunctions")
 abstract class SingleBackendWindowManager<H : WindowHandle> : WindowManager {
     protected abstract val logger: Logger
+
+    private var lastPreviewWorkArea: Rectangle? = null
 
     /**
      * Casts [window] to this backend's handle type, or returns `null` when the
@@ -69,5 +80,65 @@ abstract class SingleBackendWindowManager<H : WindowHandle> : WindowManager {
             return
         }
         focusHandle(handle)
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    override suspend fun showPreview(
+        window: Window,
+        targetWorkArea: Rectangle?,
+        scope: CoroutineScope,
+    ) {
+        val workArea = targetWorkArea ?: window.workAreaBounds()
+        val sameMonitor = lastPreviewWorkArea == workArea
+        val awtWorkArea = window.workAreaBounds()
+        logger.info { "Preview show sameMonitor=$sameMonitor bounds=${window.bounds} awtWorkArea=$awtWorkArea" }
+        if (!sameMonitor) {
+            val frame = window as? Frame
+            frame?.isResizable = true
+            try {
+                window.bounds = workArea
+                val placed = placePreview(window, workArea, PREVIEW_TIMEOUT_MS)
+                lastPreviewWorkArea = if (placed) workArea else null
+            } catch (e: CancellationException) {
+                lastPreviewWorkArea = null
+                throw e
+            } catch (e: Exception) {
+                lastPreviewWorkArea = null
+                logger.warning { "Preview placement failed: ${e.message}" }
+            } finally {
+                frame?.isResizable = false
+            }
+        } else if (window.bounds != awtWorkArea) {
+            // A hidden window can lose its bounds; restore them before reveal.
+            logger.info { "Preview bounds drifted to ${window.bounds}; restoring $awtWorkArea" }
+            window.bounds = awtWorkArea
+        }
+        if (sameMonitor && keepsPreviewMaximizedWhenHidden) {
+            logger.info { "Preview maximize skipped; window stays maximized while hidden" }
+        } else if (sameMonitor) {
+            reassertPreviewMaximize(window, scope)
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun reassertPreviewMaximize(
+        window: Window,
+        scope: CoroutineScope,
+    ) {
+        scope.launch {
+            val started = TimeSource.Monotonic.markNow()
+            try {
+                val maximized = enterFullscreen(window, PREVIEW_TIMEOUT_MS)
+                if (!maximized) {
+                    logger.info { "Preview was not maximized after re-asserting maximize" }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warning { "Preview maximize failed: ${e.message}" }
+            } finally {
+                logger.info { "Preview maximize elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
+            }
+        }
     }
 }

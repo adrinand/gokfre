@@ -1,5 +1,6 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.CoroutineScope
 import java.awt.Rectangle
 import java.awt.Window
 
@@ -7,7 +8,7 @@ import java.awt.Window
  * Abstraction over the OS windowing layer used to read the active/focused window
  * and change its bounds.
  */
-@Suppress("ComplexInterface")
+@Suppress("ComplexInterface", "TooManyFunctions")
 interface WindowManager {
     /**
      * Whether a hidden preview keeps its maximized state, so re-asserting it on
@@ -15,6 +16,17 @@ interface WindowManager {
      */
     val keepsPreviewMaximizedWhenHidden: Boolean
         get() = false
+
+    /**
+     * Applies one-time platform-specific configuration to the preview window.
+     */
+    fun configurePreviewWindow(window: Window) {}
+
+    /**
+     * Whether the preview should be always-on-top for the given visibility.
+     * Linux ties it to visibility to avoid a hidden-window quirk.
+     */
+    fun previewAlwaysOnTop(visible: Boolean): Boolean = !isLinux() || visible
 
     /**
      * Returns a platform-specific handle for the currently active window,
@@ -93,6 +105,18 @@ interface WindowManager {
         window.bounds = bounds
         return enterFullscreen(window, timeoutMs)
     }
+
+    /**
+     * Prepares [window] for display on [targetWorkArea]. Placement (restore,
+     * move, maximize) finishes before this returns so the caller can reveal the
+     * window without intermediate states. Any post-reveal maximize re-assert is
+     * scheduled on [scope].
+     */
+    suspend fun showPreview(
+        window: Window,
+        targetWorkArea: Rectangle?,
+        scope: CoroutineScope,
+    )
 
     /**
      * Requests that the Gokfre preview [window] become the active/focused

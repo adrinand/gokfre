@@ -1,5 +1,6 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.CoroutineScope
 import java.awt.Rectangle
 import java.awt.Window
 
@@ -54,6 +55,14 @@ class HeadlessWindowManager : WindowManager {
         window: Window,
         timeoutMs: Long,
     ): Boolean = true
+
+    override suspend fun showPreview(
+        window: Window,
+        targetWorkArea: Rectangle?,
+        scope: CoroutineScope,
+    ) {
+        // No-op: tests drive placement directly.
+    }
 
     companion object {
         const val DEFAULT_HEADLESS_WINDOW_ID = 42L

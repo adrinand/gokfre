@@ -45,6 +45,11 @@ class MacWindowManager internal constructor(
         source.raise(handle.pid)
     }
 
+    override suspend fun focusPreview(window: Window) {
+        focusAppWindow()
+        super.focusPreview(window)
+    }
+
     override suspend fun enterFullscreen(
         window: Window,
         timeoutMs: Long,
