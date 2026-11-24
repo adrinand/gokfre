@@ -16,6 +16,12 @@ class MacWindowManager internal constructor(
 ) : SingleBackendWindowManager<WindowHandle.Mac>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacWindowManager")
 
+    @Volatile
+    private var missingWindowLogged = false
+
+    @Volatile
+    private var fallbackWindowLogged = false
+
     constructor() : this(NativeMacWindowSource)
 
     override fun castHandle(window: WindowHandle): WindowHandle.Mac? = window as? WindowHandle.Mac
@@ -59,11 +65,20 @@ class MacWindowManager internal constructor(
             (focusedAppPid ?: focusedElementPid ?: source.frontmostWindowPid(selfPid))
                 ?.takeIf { it != selfPid }
         if (pid == null) {
-            logger.warning { "Could not determine the frontmost application or window" }
+            if (!missingWindowLogged) {
+                logger.warning { "Could not determine the frontmost application or window" }
+                missingWindowLogged = true
+            }
             return null
         }
+        missingWindowLogged = false
         if (focusedAppPid != pid) {
-            logger.info { "Using fallback window pid=$pid (focused app pid=$rawFocusedAppPid)" }
+            if (!fallbackWindowLogged) {
+                logger.info { "Using fallback window pid=$pid (focused app pid=$rawFocusedAppPid)" }
+                fallbackWindowLogged = true
+            }
+        } else {
+            fallbackWindowLogged = false
         }
         val title = if (focusedAppPid == pid) source.windowTitle(pid) ?: "" else ""
         return WindowHandle.Mac(pid = pid, title = title)

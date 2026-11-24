@@ -74,9 +74,15 @@ object Dbus {
                 ProcessBuilder(command)
                     .redirectErrorStream(true)
                     .start()
+            // Wait before reading so a hung client cannot block forever. These
+            // clients emit small payloads, so the pipe cannot fill before exit.
+            if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly()
+                logger.fine { "${command.joinToString(" ")} timed out after $timeoutMs ms" }
+                return null
+            }
             val output = process.inputStream.bufferedReader().readText()
-            val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-            if (!finished || process.exitValue() != 0) {
+            if (process.exitValue() != 0) {
                 logger.fine { "${command.joinToString(" ")} failed: $output" }
                 null
             } else {

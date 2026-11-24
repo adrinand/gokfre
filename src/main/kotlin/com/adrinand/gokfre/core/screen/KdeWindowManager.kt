@@ -13,6 +13,12 @@ private const val BACKEND_NAME = "kwin"
 private const val POLL_INTERVAL_MS = 50L
 private const val MAXIMIZE_SETTLE_MS = 50L
 private const val POLL_TIMEOUT_MS = 2_000L
+private const val BACKGROUND_CAPTURE_INTERVAL_MS = 1_000L
+
+private data class CapturedWindow(
+    val id: String,
+    val bounds: Rectangle,
+)
 
 /**
  * [WindowManager] implementation for native Wayland windows on KDE Plasma.
@@ -20,8 +26,10 @@ private const val POLL_TIMEOUT_MS = 2_000L
 class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.KdeWindowManager")
 
-    private var capturedId: String? = null
-    private var capturedBounds: Rectangle? = null
+    override val backgroundCaptureIntervalMs: Long = BACKGROUND_CAPTURE_INTERVAL_MS
+
+    @Volatile
+    private var capturedWindow: CapturedWindow? = null
 
     fun isAvailable(): Boolean = runner()?.run(KdeScriptRenderer.probe())?.ok == true
 
@@ -33,15 +41,14 @@ class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         if (!reply.ok) {
             return null
         }
-        capturedId = reply.id
-        capturedBounds = Rectangle(reply.x, reply.y, reply.width, reply.height)
+        capturedWindow = CapturedWindow(reply.id, Rectangle(reply.x, reply.y, reply.width, reply.height))
         return WindowHandle.Wayland(BACKEND_NAME, reply.id)
     }
 
     override fun retrieveBounds(handle: WindowHandle.Wayland): Rectangle? {
-        val cached = capturedBounds?.takeIf { handle.token == capturedId }
+        val cached = capturedWindow?.takeIf { handle.token == it.id }
         if (cached != null) {
-            return cached
+            return cached.bounds
         }
         val reply = runner()?.run(KdeScriptRenderer.bounds(handle.token)) ?: return null
         return if (reply.ok) Rectangle(reply.x, reply.y, reply.width, reply.height) else null

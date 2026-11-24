@@ -112,6 +112,18 @@ class ArrangementControllerTest {
     }
 
     @Test
+    fun `background capture is discarded when it is no longer valid`() {
+        runBlocking {
+            val controller = ArrangementController(HeadlessWindowManager())
+
+            controller.captureTargetWindowOnIo { false }
+
+            controller.hasCapturedTarget shouldBe false
+            controller.targetWorkArea shouldBe null
+        }
+    }
+
+    @Test
     fun `arrange returns null for unknown keys`() {
         runBlocking {
             val windowManager = HeadlessWindowManager()

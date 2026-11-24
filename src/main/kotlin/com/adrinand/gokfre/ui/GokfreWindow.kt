@@ -36,6 +36,7 @@ import com.adrinand.gokfre.core.screen.isX11Session
 import com.adrinand.gokfre.core.screen.skipTaskbarX11
 import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.awt.Rectangle
@@ -49,7 +50,7 @@ private val logger = Logger.getLogger("com.adrinand.gokfre.ui.GokfreWindow")
 
 const val PREVIEW_WINDOW_TITLE = "Gokfre Preview"
 
-private const val SHOW_POLL_INTERVAL_MS = 16L
+private const val SHOW_POLL_INTERVAL_MS = 2L
 private const val MAX_SHOW_WAIT_MS = 500L
 private const val FULLSCREEN_WAIT_TIMEOUT_MS = 2_000L
 private const val FADE_IN_MS = 100
@@ -58,6 +59,7 @@ private const val MAX_SELECTED_KEYS = 2
 private const val PREVIEW_OFFSCREEN_COORDINATE = -100_000
 private const val PREVIEW_HIDDEN_SIZE_DP = 1
 
+@Suppress("TooGenericExceptionCaught")
 @Composable
 fun GokfreWindow(
     visible: Boolean,
@@ -205,6 +207,7 @@ fun GokfreWindow(
         if (!visible) {
             logger.info { "LaunchedEffect: hiding preview" }
             previewReady = false
+            win.isResizable = false
             win.setOpacitySafely(0f)
             return@LaunchedEffect
         }
@@ -228,20 +231,14 @@ fun GokfreWindow(
         }
         win.isResizable = true
         try {
-            if (sameMonitor) {
-                arrangementController.windowManager.focusPreview(win)
-                launch {
-                    arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-                }
-                lastWorkArea = workArea
-            } else {
-                val placed =
-                    arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
-                lastWorkArea = if (placed) workArea else null
-                arrangementController.windowManager.focusPreview(win)
-            }
-        } finally {
+            // Focus stays on the critical path so the first keystroke reaches the
+            // preview; placement and maximizing can finish in the background.
+            arrangementController.windowManager.focusPreview(win)
+        } catch (e: CancellationException) {
             win.isResizable = false
+            throw e
+        } catch (e: Exception) {
+            logger.warning { "Preview focus failed: ${e.message}" }
         }
         if (!isLinux()) {
             focusAppWindow()
@@ -251,6 +248,28 @@ fun GokfreWindow(
         win.setOpacitySafely(1f)
         runCatching { focusRequester.requestFocus() }
             .onFailure { logger.warning { "re-request focus failed: $it" } }
+
+        launch {
+            try {
+                if (sameMonitor) {
+                    val maximized =
+                        arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
+                    lastWorkArea = if (maximized) workArea else null
+                } else {
+                    val placed =
+                        arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
+                    lastWorkArea = if (placed) workArea else null
+                }
+            } catch (e: CancellationException) {
+                lastWorkArea = null
+                throw e
+            } catch (e: Exception) {
+                lastWorkArea = null
+                logger.warning { "Preview placement failed: ${e.message}" }
+            } finally {
+                win.isResizable = false
+            }
+        }
     }
 }
 

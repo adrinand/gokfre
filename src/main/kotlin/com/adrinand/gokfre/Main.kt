@@ -26,15 +26,24 @@ import com.adrinand.gokfre.ui.createTrayIcon
 import com.adrinand.gokfre.ui.globalHotkeyRegistration
 import com.adrinand.gokfre.ui.openAccessibilitySettings
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Level
 import java.util.logging.Logger
 import javax.swing.SwingUtilities
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.Main")
+
+private const val TARGET_CAPTURE_MAX_BACKOFF_MS = 4_000L
+private const val POST_HIDE_CAPTURE_DELAY_MS = 200L
+private const val OPEN_CAPTURE_TIMEOUT_MS = 100L
 
 fun main() {
     AppLogging.initialize()
@@ -54,7 +63,13 @@ fun main() {
     runGokfreApplication(settingsRequestChannel)
 }
 
-@Suppress("LongMethod", "CognitiveComplexMethod", "LongParameterList")
+@Suppress(
+    "LongMethod",
+    "CognitiveComplexMethod",
+    "CyclomaticComplexMethod",
+    "LongParameterList",
+    "TooGenericExceptionCaught",
+)
 fun runGokfreApplication(
     settingsRequestChannel: Channel<Unit>,
     exitProcessOnExit: Boolean = true,
@@ -90,6 +105,11 @@ fun runGokfreApplication(
         var windowManager by remember { mutableStateOf<WindowManager?>(null) }
         var arrangementController by remember { mutableStateOf<ArrangementController?>(null) }
         var isWindowVisible by remember { mutableStateOf(false) }
+        val previewVisible = remember { AtomicBoolean(false) }
+        val setPreviewVisible: (Boolean) -> Unit = { visible ->
+            previewVisible.set(visible)
+            isWindowVisible = visible
+        }
         var showSettings by remember { mutableStateOf(false) }
         var showPermissionWarning by remember { mutableStateOf(false) }
         val trayIcon = remember { createTrayIcon() }
@@ -112,14 +132,69 @@ fun runGokfreApplication(
             settingsRequestChannel.consumeEach { showSettings = true }
         }
 
+        LaunchedEffect(arrangementController) {
+            val controller = arrangementController ?: return@LaunchedEffect
+            val baseIntervalMs = controller.windowManager.backgroundCaptureIntervalMs
+            var intervalMs = baseIntervalMs
+            var previewWasVisible = previewVisible.get()
+            while (isActive) {
+                if (previewVisible.get()) {
+                    previewWasVisible = true
+                    intervalMs = baseIntervalMs
+                } else {
+                    if (previewWasVisible) {
+                        // Let focus return to the target window so the preview
+                        // itself is not captured as the next target.
+                        delay(POST_HIDE_CAPTURE_DELAY_MS)
+                        previewWasVisible = false
+                        intervalMs = baseIntervalMs
+                    }
+                    if (!previewVisible.get()) {
+                        val captured =
+                            try {
+                                controller.captureTargetWindowOnIo { !previewVisible.get() }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                logger.fine { "Background target capture failed: ${e.message}" }
+                                false
+                            }
+                        intervalMs =
+                            if (captured) {
+                                baseIntervalMs
+                            } else {
+                                (intervalMs * 2).coerceAtMost(TARGET_CAPTURE_MAX_BACKOFF_MS)
+                            }
+                    }
+                }
+                delay(intervalMs)
+            }
+        }
+
+        val opening = remember { AtomicBoolean(false) }
         val toggleWindow = {
             val controller = arrangementController
             if (controller != null) {
-                if (!isWindowVisible) {
-                    controller.captureTargetWindow()
+                if (previewVisible.get()) {
+                    setPreviewVisible(false)
+                    logger.info("Preview window visible=false")
+                } else if (opening.compareAndSet(false, true)) {
+                    settingsCoroutineScope.launch {
+                        try {
+                            controller.invalidateCaptureInFlight()
+                            // Capture while the target still has focus; the
+                            // preview only takes focus once it is visible.
+                            withTimeoutOrNull(OPEN_CAPTURE_TIMEOUT_MS) {
+                                controller.captureTargetWindowOnIo { !previewVisible.get() }
+                            }
+                            setPreviewVisible(true)
+                            controller.invalidateCaptureInFlight()
+                            logger.info("Preview window visible=true")
+                        } finally {
+                            opening.set(false)
+                        }
+                    }
                 }
-                isWindowVisible = !isWindowVisible
-                logger.info("Preview window visible=$isWindowVisible")
             } else {
                 logger.info { "Window manager not ready yet, ignoring toggle" }
             }
@@ -136,7 +211,7 @@ fun runGokfreApplication(
         arrangementController?.let { controller ->
             GokfreWindow(
                 visible = isWindowVisible,
-                onClose = { isWindowVisible = false },
+                onClose = { setPreviewVisible(false) },
                 viewModel = settingsViewModel,
                 arrangementController = controller,
             )

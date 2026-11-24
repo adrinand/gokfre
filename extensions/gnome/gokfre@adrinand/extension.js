@@ -93,10 +93,13 @@ function findPreviewWindow() {
 
 class GokfreDBus {
     CaptureActiveWindow() {
-        capturedWindow = global.display.focus_window;
-        if (!capturedWindow) {
+        const focused = global.display.focus_window;
+        // Never replace the real target with our own preview; the app may still
+        // have an in-flight background capture when the preview takes focus.
+        if (!focused || focused.title === PREVIEW_TITLE) {
             return [false, 0, 0, 0, 0];
         }
+        capturedWindow = focused;
         try {
             const monitor = capturedWindow.get_monitor();
             const workspace = global.workspace_manager.get_active_workspace();
