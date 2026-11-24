@@ -138,6 +138,13 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         timeoutMs: Long,
     ): Boolean =
         withContext(Dispatchers.IO) {
+            val alreadyMaximized =
+                callMethod("IsPreviewMaximized", timeoutMs = CALL_TIMEOUT_MS)
+                    ?.let { parseLeadingBoolean(it.trim()) } == true
+            if (alreadyMaximized) {
+                return@withContext true
+            }
+            logger.info { "Preview was not maximized; maximizing now" }
             val output = callMethod("MaximizePreview", timeoutMs = CALL_TIMEOUT_MS) ?: return@withContext false
             if (parseLeadingBoolean(output.trim()) != true) {
                 logger.warning { "GNOME extension did not maximize the preview" }
