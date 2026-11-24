@@ -1,7 +1,7 @@
 ---
 description: Runs the local verification pipeline (Gradle check, Rust tests, E2E tests) and reports results.
 mode: subagent
-model: opencode/deepseek-v4.1-flash-free
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: deny
   bash: ask
