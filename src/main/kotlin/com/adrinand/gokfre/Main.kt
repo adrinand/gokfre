@@ -1,45 +1,21 @@
 package com.adrinand.gokfre
 
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.application
 import com.adrinand.gokfre.core.comms.AppSocketComms
 import com.adrinand.gokfre.core.hotkey.GlobalHotkeyProvider
 import com.adrinand.gokfre.core.logging.AppLogging
 import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
-import com.adrinand.gokfre.core.screen.ArrangementController
-import com.adrinand.gokfre.core.screen.WindowManager
-import com.adrinand.gokfre.core.screen.createWindowManager
-import com.adrinand.gokfre.core.screen.isLinux
 import com.adrinand.gokfre.core.startup.StartupLauncher
 import com.adrinand.gokfre.core.startup.createStartupLauncher
-import com.adrinand.gokfre.ui.GokfreTray
-import com.adrinand.gokfre.ui.GokfreWindow
-import com.adrinand.gokfre.ui.InputPermissionWarningDialog
-import com.adrinand.gokfre.ui.MacAccessibilityWarningWindow
-import com.adrinand.gokfre.ui.SettingsWindow
-import com.adrinand.gokfre.ui.createTrayIcon
-import com.adrinand.gokfre.ui.globalHotkeyRegistration
-import com.adrinand.gokfre.ui.openAccessibilitySettings
+import com.adrinand.gokfre.ui.ApplicationDependencies
+import com.adrinand.gokfre.ui.GokfreApplicationContent
+import com.adrinand.gokfre.ui.rememberApplicationState
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.logging.Level
 import java.util.logging.Logger
 import javax.swing.SwingUtilities
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.Main")
-
-private const val OPEN_CAPTURE_TIMEOUT_MS = 250L
 
 fun main() {
     AppLogging.initialize()
@@ -59,13 +35,7 @@ fun main() {
     runGokfreApplication(settingsRequestChannel)
 }
 
-@Suppress(
-    "LongMethod",
-    "CognitiveComplexMethod",
-    "CyclomaticComplexMethod",
-    "LongParameterList",
-    "TooGenericExceptionCaught",
-)
+@Suppress("LongParameterList")
 fun runGokfreApplication(
     settingsRequestChannel: Channel<Unit>,
     exitProcessOnExit: Boolean = true,
@@ -77,132 +47,37 @@ fun runGokfreApplication(
     globalHotkeyProvider: GlobalHotkeyProvider? = null,
     toggleDispatcher: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
 ) {
-    val effectiveSettingsRepository =
-        settingsRepository
-            ?: runCatching { SettingsRepository() }
-                .onFailure { logger.warning("Failed to initialize settings repository: ${it.message}") }
-                .getOrNull()
-
-    val effectiveStartupLauncher =
-        startupLauncher
-            ?: runCatching { createStartupLauncher() }
-                .onFailure { logger.warning("Failed to initialize startup launcher: ${it.message}") }
-                .getOrNull()
-
+    val dependencies = createApplicationDependencies(settingsRepository, startupLauncher)
     application(exitProcessOnExit = exitProcessOnExit) {
-        val settingsCoroutineScope = rememberCoroutineScope()
-        val settingsViewModel =
-            remember {
-                SettingsViewModel(settingsCoroutineScope, effectiveSettingsRepository, effectiveStartupLauncher)
-            }
-        LaunchedEffect(settingsViewModel) {
-            onViewModelCreated(settingsViewModel)
-        }
-        var windowManager by remember { mutableStateOf<WindowManager?>(null) }
-        var arrangementController by remember { mutableStateOf<ArrangementController?>(null) }
-        var isWindowVisible by remember { mutableStateOf(false) }
-        val previewVisible = remember { AtomicBoolean(false) }
-        val setPreviewVisible: (Boolean) -> Unit = { visible ->
-            previewVisible.set(visible)
-            isWindowVisible = visible
-        }
-        var showSettings by remember { mutableStateOf(false) }
-        var showPermissionWarning by remember { mutableStateOf(false) }
-        val trayIcon = remember { createTrayIcon() }
-
-        LaunchedEffect(Unit) {
-            launch {
-                shutdownChannel.receive()
-                exitApplication()
-            }
-            launch(Dispatchers.IO) {
-                runCatching {
-                    val manager = createWindowManager()
-                    windowManager = manager
-                    arrangementController = ArrangementController(manager)
-                    onReady()
-                }.onFailure {
-                    logger.log(Level.SEVERE, "Failed to initialize window manager", it)
-                }
-            }
-            settingsRequestChannel.consumeEach { showSettings = true }
-        }
-
-        val opening = remember { AtomicBoolean(false) }
-        val toggleWindow = {
-            val controller = arrangementController
-            if (controller != null) {
-                if (previewVisible.get()) {
-                    setPreviewVisible(false)
-                    logger.info("Preview window visible=false")
-                } else if (opening.compareAndSet(false, true)) {
-                    settingsCoroutineScope.launch {
-                        try {
-                            try {
-                                // Capture while the target still has focus; the
-                                // preview only takes focus once it is shown.
-                                withTimeoutOrNull(OPEN_CAPTURE_TIMEOUT_MS) {
-                                    controller.captureTargetWindowOnIo()
-                                }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Throwable) {
-                                // Never let a backend failure cancel the shared
-                                // composition scope (hotkey/autosave live there).
-                                logger.log(Level.WARNING, "Target capture failed, showing preview anyway", e)
-                            }
-                            setPreviewVisible(true)
-                            logger.info("Preview window visible=true")
-                        } finally {
-                            opening.set(false)
-                        }
-                    }
-                }
-            } else {
-                logger.info { "Window manager not ready yet, ignoring toggle" }
-            }
-        }
-
-        globalHotkeyRegistration(
-            settingsViewModel = settingsViewModel,
-            onPermissionMissing = { showPermissionWarning = true },
-            onToggle = toggleWindow,
+        val state =
+            rememberApplicationState(
+                dependencies = dependencies,
+                settingsRequestChannel = settingsRequestChannel,
+                shutdownChannel = shutdownChannel,
+                onReady = onReady,
+                onViewModelCreated = onViewModelCreated,
+            )
+        GokfreApplicationContent(
+            state = state,
             globalHotkeyProvider = globalHotkeyProvider,
             toggleDispatcher = toggleDispatcher,
         )
-
-        arrangementController?.let { controller ->
-            GokfreWindow(
-                visible = isWindowVisible,
-                onClose = { setPreviewVisible(false) },
-                viewModel = settingsViewModel,
-                arrangementController = controller,
-            )
-        }
-
-        GokfreTray(
-            icon = trayIcon,
-            onToggle = toggleWindow,
-            onSettings = { showSettings = true },
-        )
-
-        if (showSettings) {
-            SettingsWindow(
-                isVisible = showSettings,
-                onClose = { showSettings = false },
-                viewModel = settingsViewModel,
-            )
-        }
-
-        if (showPermissionWarning) {
-            if (isLinux()) {
-                InputPermissionWarningDialog(onDismiss = { showPermissionWarning = false })
-            } else {
-                MacAccessibilityWarningWindow(
-                    onDismiss = { showPermissionWarning = false },
-                    onOpenSystemSettings = ::openAccessibilitySettings,
-                )
-            }
-        }
     }
 }
+
+private fun createApplicationDependencies(
+    settingsRepository: SettingsRepository?,
+    startupLauncher: StartupLauncher?,
+): ApplicationDependencies =
+    ApplicationDependencies(
+        settingsRepository =
+            settingsRepository
+                ?: runCatching { SettingsRepository() }
+                    .onFailure { logger.warning("Failed to initialize settings repository: ${it.message}") }
+                    .getOrNull(),
+        startupLauncher =
+            startupLauncher
+                ?: runCatching { createStartupLauncher() }
+                    .onFailure { logger.warning("Failed to initialize startup launcher: ${it.message}") }
+                    .getOrNull(),
+    )

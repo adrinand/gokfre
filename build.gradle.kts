@@ -180,6 +180,8 @@ kover {
                 classes(
                     "com.adrinand.gokfre.MainKt*",
                     "com.adrinand.gokfre.ComposableSingletons*",
+                    "com.adrinand.gokfre.ui.ApplicationState*",
+                    "com.adrinand.gokfre.ui.ApplicationRootKt*",
                     "com.adrinand.gokfre.core.screen.*",
                     "com.adrinand.gokfre.core.startup.*",
                     "com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider*",
