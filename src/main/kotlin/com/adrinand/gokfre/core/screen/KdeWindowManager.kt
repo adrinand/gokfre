@@ -26,10 +26,6 @@ private data class CapturedWindow(
 class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.KdeWindowManager")
 
-    // KWin keeps a hidden window's maximize state, so the same-monitor
-    // re-assert only costs script loads and polls.
-    override val keepsPreviewMaximizedWhenHidden: Boolean = true
-
     @Volatile
     private var capturedWindow: CapturedWindow? = null
 

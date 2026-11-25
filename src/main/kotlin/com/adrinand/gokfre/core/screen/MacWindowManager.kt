@@ -18,10 +18,6 @@ class MacWindowManager internal constructor(
 ) : SingleBackendWindowManager<WindowHandle.Mac>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacWindowManager")
 
-    // macOS maximize is a no-op here: the preview is sized client-side and
-    // keeps its AWT bounds while hidden.
-    override val keepsPreviewMaximizedWhenHidden: Boolean = true
-
     @Volatile
     private var missingWindowLogged = false
 

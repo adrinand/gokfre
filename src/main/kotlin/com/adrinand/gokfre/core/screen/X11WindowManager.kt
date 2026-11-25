@@ -19,7 +19,8 @@ import java.util.logging.Logger
  */
 @Suppress("TooManyFunctions")
 object X11WindowManager : SingleBackendWindowManager<WindowHandle.X11>() {
-    override val logger = Logger.getLogger("com.adrinand.gokfre.core.screen.X11WindowManager")
+    override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.X11WindowManager")
+    override val keepsPreviewMaximizedWhenHidden: Boolean = false
 
     private const val CLIENT_MESSAGE_FORMAT = 32
     private const val NET_WM_STATE_REMOVE = 0L

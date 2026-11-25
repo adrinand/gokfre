@@ -109,7 +109,6 @@ abstract class SingleBackendWindowManager<H : WindowHandle> : WindowManager {
                 frame?.isResizable = false
             }
         } else if (window.bounds != awtWorkArea) {
-            // A hidden window can lose its bounds; restore them before reveal.
             logger.info { "Preview bounds drifted to ${window.bounds}; restoring $awtWorkArea" }
             window.bounds = awtWorkArea
         }

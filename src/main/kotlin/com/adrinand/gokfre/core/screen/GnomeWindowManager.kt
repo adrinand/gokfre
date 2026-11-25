@@ -68,10 +68,6 @@ internal fun parseCapturedWorkArea(output: String): Rectangle? {
 class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.GnomeWindowManager")
 
-    // Mutter keeps a hidden maximized window maximized, so the same-monitor
-    // re-assert only costs a D-Bus round-trip.
-    override val keepsPreviewMaximizedWhenHidden: Boolean = true
-
     @Volatile
     private var capturedWorkArea: Rectangle? = null
 
@@ -202,8 +198,6 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 false
             }
         if (!placed) {
-            // [bounds] is logical while AWT is in XWayland pixels; writing it
-            // client-side would move the preview to the wrong place.
             logger.warning { "GNOME extension could not place the preview; keeping its current bounds" }
         }
         return placed
@@ -223,9 +217,6 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
             logger.info { "GNOME focus confirmed attempts=$attempts elapsedMs=$elapsedMs" }
             return
         }
-        // The shell has not confirmed yet. Give client-side activation a head
-        // start instead of waiting the full retry window, then keep retrying
-        // the shell so a blocked AWT request can still recover.
         super.focusPreview(window)
         delay(AWT_FOCUS_GRACE_MS.milliseconds)
         if (window.isFocused) {

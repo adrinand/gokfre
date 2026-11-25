@@ -15,7 +15,7 @@ interface WindowManager {
      * every open only costs a backend round-trip.
      */
     val keepsPreviewMaximizedWhenHidden: Boolean
-        get() = false
+        get() = true
 
     /**
      * Applies one-time platform-specific configuration to the preview window.
