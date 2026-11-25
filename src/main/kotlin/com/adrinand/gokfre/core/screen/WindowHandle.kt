@@ -1,5 +1,7 @@
 package com.adrinand.gokfre.core.screen
 
+private const val HEX_RADIX = 16
+
 /**
  * Platform-neutral reference to a window.
  *
@@ -8,8 +10,6 @@ package com.adrinand.gokfre.core.screen
  * meaningful only to the backend that created it.
  */
 sealed class WindowHandle {
-    private val hexRadix = 16
-
     /**
      * An X11 window identified by its XID.
      */
@@ -38,7 +38,7 @@ sealed class WindowHandle {
      */
     fun format(): String =
         when (this) {
-            is WindowHandle.X11 -> "0x${id.toString(hexRadix)}"
+            is WindowHandle.X11 -> "0x${id.toString(HEX_RADIX)}"
             is WindowHandle.Wayland -> "wayland:$backend:$token"
             is WindowHandle.Mac -> "mac:pid=$pid"
         }
