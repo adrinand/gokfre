@@ -22,6 +22,7 @@ private data class CapturedWindow(
 /**
  * [WindowManager] implementation for native Wayland windows on KDE Plasma.
  */
+@Suppress("TooManyFunctions")
 class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.KdeWindowManager")
 
@@ -32,18 +33,42 @@ class KdeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
     @Volatile
     private var capturedWindow: CapturedWindow? = null
 
+    @Volatile
+    private var capturedWorkArea: Rectangle? = null
+
     fun isAvailable(): Boolean = runner()?.run(KdeScriptRenderer.probe())?.ok == true
 
     override fun castHandle(window: WindowHandle): WindowHandle.Wayland? =
         (window as? WindowHandle.Wayland)?.takeIf { it.backend == BACKEND_NAME }
 
     override fun retrieveActiveWindow(): WindowHandle.Wayland? {
-        val reply = runner()?.run(KdeScriptRenderer.capture()) ?: return null
-        if (!reply.ok) {
+        val reply = runner()?.run(KdeScriptRenderer.capture())
+        if (reply?.ok != true) {
+            capturedWorkArea = null
             return null
         }
         capturedWindow = CapturedWindow(reply.id, Rectangle(reply.x, reply.y, reply.width, reply.height))
+        capturedWorkArea = reply.workArea()
         return WindowHandle.Wayland(BACKEND_NAME, reply.id)
+    }
+
+    override fun getWorkArea(
+        window: WindowHandle,
+        bounds: Rectangle?,
+    ): Rectangle? {
+        val handle = window as? WindowHandle.Wayland
+        val cached = capturedWindow?.takeIf { handle?.token == it.id }
+        if (cached != null) {
+            return capturedWorkArea ?: awtWorkAreaForWindowBounds(cached.bounds)
+        }
+        return super.getWorkArea(window, bounds)
+    }
+
+    private fun KdeScriptReply.workArea(): Rectangle? {
+        val width = workAreaWidth ?: return null
+        val height = workAreaHeight ?: return null
+        return Rectangle(workAreaX ?: 0, workAreaY ?: 0, width, height)
+            .takeIf { it.width > 0 && it.height > 0 }
     }
 
     override fun retrieveBounds(handle: WindowHandle.Wayland): Rectangle? {

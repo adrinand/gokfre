@@ -36,6 +36,15 @@ class MacWindowManager internal constructor(
 
     override fun retrieveBounds(handle: WindowHandle.Mac): Rectangle? = source.windowBounds(handle.pid)
 
+    override fun getWorkArea(
+        window: WindowHandle,
+        bounds: Rectangle?,
+    ): Rectangle? {
+        val handle = window as? WindowHandle.Mac ?: return super.getWorkArea(window, bounds)
+        val effectiveBounds = bounds ?: source.windowBounds(handle.pid) ?: return null
+        return awtWorkAreaForWindowBounds(effectiveBounds)
+    }
+
     override fun applyBounds(
         handle: WindowHandle.Mac,
         bounds: Rectangle,

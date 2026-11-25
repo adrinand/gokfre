@@ -32,7 +32,11 @@ class HeadlessWindowManager : WindowManager {
     override fun getWorkArea(
         window: WindowHandle,
         bounds: Rectangle?,
-    ): Rectangle? = activeWindowWorkArea ?: super.getWorkArea(window, bounds)
+    ): Rectangle? {
+        activeWindowWorkArea?.let { return it }
+        val effectiveBounds = bounds ?: activeWindowBounds ?: return null
+        return awtWorkAreaForWindowBounds(effectiveBounds)
+    }
 
     override fun setWindowBounds(
         window: WindowHandle,

@@ -39,15 +39,7 @@ class ArrangementController(
      */
     fun captureTargetWindow() {
         val window = windowManager.getActiveWindowId()
-        val workArea =
-            window?.let { handle ->
-                // Backends that track the work area (GNOME) answer without a
-                // bounds lookup, which keeps the open path cheap.
-                windowManager.getWorkArea(handle, null)
-                    ?: windowManager.getWindowBounds(handle)?.let { bounds ->
-                        windowManager.getWorkArea(handle, bounds)
-                    }
-            }
+        val workArea = window?.let { windowManager.getWorkArea(it, null) }
         capturedTarget = CapturedTarget(window = window, workArea = workArea)
         logger.info { "Captured target window: ${window?.format()}, workArea=$workArea" }
     }

@@ -35,6 +35,15 @@ class KdeScriptRendererTest {
     }
 
     @Test
+    fun `capture script reports the work area for the window screen`() {
+        val script = KdeScriptRenderer.capture()
+
+        script shouldContain "workspace.clientArea"
+        script shouldContain "KWin.PlacementArea"
+        script shouldContain "workAreaX"
+    }
+
+    @Test
     fun `moveResize embeds the requested bounds`() {
         val script = KdeScriptRenderer.moveResize(windowId, Rectangle(10, 20, 300, 400))
 

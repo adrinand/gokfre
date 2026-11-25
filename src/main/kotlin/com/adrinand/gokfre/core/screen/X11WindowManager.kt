@@ -63,6 +63,15 @@ object X11WindowManager : SingleBackendWindowManager<WindowHandle.X11>() {
         }
     }
 
+    override fun getWorkArea(
+        window: WindowHandle,
+        bounds: Rectangle?,
+    ): Rectangle? {
+        val handle = window as? WindowHandle.X11 ?: return super.getWorkArea(window, bounds)
+        val effectiveBounds = bounds ?: retrieveBounds(handle) ?: return null
+        return awtWorkAreaForWindowBounds(effectiveBounds)
+    }
+
     override fun applyBounds(
         handle: WindowHandle.X11,
         bounds: Rectangle,
