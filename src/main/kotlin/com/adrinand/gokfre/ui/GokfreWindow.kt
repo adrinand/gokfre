@@ -216,14 +216,13 @@ fun GokfreWindow(
         if (!win.isShowing) {
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
+
         windowManager.showPreview(
             win,
             arrangementController.targetWorkArea ?: win.workAreaBounds(),
             this,
         )
 
-        // The focus handoff can take tens of ms on Wayland, so it runs in the
-        // background while the 100 ms fade-in masks it.
         launch {
             val started = TimeSource.Monotonic.markNow()
             try {

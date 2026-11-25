@@ -76,8 +76,7 @@ object Dbus {
                     .redirectErrorStream(true)
                     .start()
             process = started
-            // Wait before reading so a hung client cannot block forever. These
-            // clients emit small payloads, so the pipe cannot fill before exit.
+
             if (!started.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
                 started.destroyForcibly()
                 logger.fine { "${command.joinToString(" ")} timed out after $timeoutMs ms" }

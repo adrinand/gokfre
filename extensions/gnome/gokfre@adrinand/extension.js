@@ -1,7 +1,7 @@
 import Gio from 'gi://Gio';
 import Meta from 'gi://Meta';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const DBUS_INTERFACE = `
 <node>
@@ -94,8 +94,7 @@ function findPreviewWindow() {
 class GokfreDBus {
     CaptureActiveWindow() {
         const focused = global.display.focus_window;
-        // Never replace the real target with our own preview; the app may still
-        // have an in-flight background capture when the preview takes focus.
+
         if (!focused || focused.title === PREVIEW_TITLE) {
             return [false, 0, 0, 0, 0];
         }

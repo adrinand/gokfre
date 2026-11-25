@@ -8,17 +8,7 @@ import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.core.screen.ArrangementController")
-
 private const val FOCUS_SETTLE_DELAY_MS = 100L
-private const val HEX_RADIX = 16
-
-private fun WindowHandle?.format(): String =
-    when (this) {
-        null -> "null"
-        is WindowHandle.X11 -> "0x${id.toString(HEX_RADIX)}"
-        is WindowHandle.Wayland -> "wayland:$backend:$token"
-        is WindowHandle.Mac -> "mac:pid=$pid"
-    }
 
 /**
  * Orchestrates capturing the target window and applying a tiled bounds to it.
@@ -59,15 +49,12 @@ class ArrangementController(
                     }
             }
         capturedTarget = CapturedTarget(window = window, workArea = workArea)
-        logger.info { "Captured target window: ${window.format()}, workArea=$workArea" }
+        logger.info { "Captured target window: ${window?.format()}, workArea=$workArea" }
     }
 
     /**
      * Captures the active window on [Dispatchers.IO] so the hotkey handler does
      * not block the UI thread.
-     *
-     * Uses [runInterruptible] so a caller-side timeout can interrupt a slow
-     * backend call instead of stalling the preview indefinitely.
      */
     suspend fun captureTargetWindowOnIo() {
         runInterruptible(Dispatchers.IO) {

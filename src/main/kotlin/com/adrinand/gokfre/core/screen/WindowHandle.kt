@@ -8,6 +8,8 @@ package com.adrinand.gokfre.core.screen
  * meaningful only to the backend that created it.
  */
 sealed class WindowHandle {
+    private val hexRadix = 16
+
     /**
      * An X11 window identified by its XID.
      */
@@ -30,4 +32,14 @@ sealed class WindowHandle {
      * operations are performed on the focused window of the captured process.
      */
     data class Mac(val pid: Long, val title: String = "") : WindowHandle()
+
+    /**
+     * Returns the display name of the window.
+     */
+    fun format(): String =
+        when (this) {
+            is WindowHandle.X11 -> "0x${id.toString(hexRadix)}"
+            is WindowHandle.Wayland -> "wayland:$backend:$token"
+            is WindowHandle.Mac -> "mac:pid=$pid"
+        }
 }
