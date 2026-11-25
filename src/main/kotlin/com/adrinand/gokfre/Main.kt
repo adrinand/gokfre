@@ -46,6 +46,7 @@ fun runGokfreApplication(
     startupLauncher: StartupLauncher? = null,
     globalHotkeyProvider: GlobalHotkeyProvider? = null,
     toggleDispatcher: (() -> Unit) -> Unit = { SwingUtilities.invokeLater(it) },
+    e2eMode: Boolean = false,
 ) {
     val dependencies = createApplicationDependencies(settingsRepository, startupLauncher)
     application(exitProcessOnExit = exitProcessOnExit) {
@@ -56,6 +57,7 @@ fun runGokfreApplication(
                 shutdownChannel = shutdownChannel,
                 onReady = onReady,
                 onViewModelCreated = onViewModelCreated,
+                e2eMode = e2eMode,
             )
         GokfreApplicationContent(
             state = state,

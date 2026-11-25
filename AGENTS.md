@@ -19,7 +19,7 @@ window.
   hotkeys.
 - **D-Bus:** `dbus-java` (core + native unixsocket transport) is used on KDE to
   host the bridge KWin scripts report through.
-- **Testing:** Kotest + JUnit 4 (Compose UI tests via `createComposeRule`),
+- **Testing:** Kotest + JUnit 4 + MockK (Compose UI tests via `createComposeRule`),
   plus real-desktop E2E tests under `src/e2e/kotlin`.
 
 ## Project layout
@@ -164,8 +164,9 @@ session bus. Design notes live here instead of in code comments.
 - **Show-path ownership:** `GokfreWindow` only manages Compose state (fade,
   key selection, focus requester). `WindowManager.showPreview` owns monitor
   tracking, placement, the bounds-drift guard, and the same-monitor maximize
-  decision. `keepsPreviewMaximizedWhenHidden` is true on GNOME/KDE/macOS and false
-  on X11. Platform quirks stay in backends: X11 configures the taskbar hint,
+  decision. `keepsPreviewMaximizedWhenHidden` defaults to `true`; X11 overrides it
+  to `false` because some X11 WMs drop the maximized state across unmap. Platform
+  quirks stay in backends: X11 configures the taskbar hint,
   macOS activates the app before AWT focus, and Linux ties `alwaysOnTop` to
   visibility.
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and

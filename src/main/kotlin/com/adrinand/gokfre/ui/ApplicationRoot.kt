@@ -5,7 +5,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.ApplicationScope
 import com.adrinand.gokfre.core.hotkey.GlobalHotkeyProvider
-import com.adrinand.gokfre.core.screen.isLinux
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -21,6 +20,7 @@ internal fun ApplicationScope.GokfreApplicationContent(
             exitApplication()
         }
         launch(Dispatchers.IO) { state.initializeWindowManager() }
+        launch { state.checkLinuxRequirements() }
         state.consumeSettingsRequests()
     }
 
@@ -56,25 +56,19 @@ internal fun ApplicationScope.GokfreApplicationContent(
         )
     }
 
-    PermissionWarning(
-        visible = state.isPermissionWarningVisible,
-        onDismiss = state::dismissPermissionWarning,
-    )
+    WarningWindows(state)
 }
 
 @Composable
-private fun PermissionWarning(
-    visible: Boolean,
-    onDismiss: () -> Unit,
-) {
-    if (!visible) {
-        return
-    }
-    if (isLinux()) {
-        InputPermissionWarningDialog(onDismiss = onDismiss)
-    } else {
+private fun WarningWindows(state: ApplicationState) {
+    if (state.linuxMissingRequirements.isNotEmpty()) {
+        LinuxWarningWindow(
+            requirements = state.linuxMissingRequirements,
+            onDismiss = state::dismissLinuxWarning,
+        )
+    } else if (state.isMacAccessibilityWarningVisible) {
         MacAccessibilityWarningWindow(
-            onDismiss = onDismiss,
+            onDismiss = state::dismissMacWarning,
             onOpenSystemSettings = ::openAccessibilitySettings,
         )
     }

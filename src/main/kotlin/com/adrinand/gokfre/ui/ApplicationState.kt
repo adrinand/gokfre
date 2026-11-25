@@ -10,14 +10,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
 import com.adrinand.gokfre.core.screen.ArrangementController
+import com.adrinand.gokfre.core.screen.LinuxRequirement
+import com.adrinand.gokfre.core.screen.LinuxRequirementChecker
 import com.adrinand.gokfre.core.screen.createWindowManager
+import com.adrinand.gokfre.core.screen.isLinux
 import com.adrinand.gokfre.core.startup.StartupLauncher
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Level
@@ -37,6 +42,7 @@ internal data class ApplicationDependencies(
  * Owns the mutable state that drives the application shell and the actions that
  * mutate it.
  */
+@Suppress("TooManyFunctions")
 @Stable
 internal class ApplicationState(
     val settingsViewModel: SettingsViewModel,
@@ -44,6 +50,7 @@ internal class ApplicationState(
     private val settingsRequestChannel: Channel<Unit>,
     private val shutdownChannel: Channel<Unit>,
     private val onReady: () -> Unit,
+    private val e2eMode: Boolean = false,
 ) {
     var arrangementController: ArrangementController? by mutableStateOf(null)
         private set
@@ -54,8 +61,23 @@ internal class ApplicationState(
     var isSettingsVisible: Boolean by mutableStateOf(false)
         private set
 
-    var isPermissionWarningVisible: Boolean by mutableStateOf(false)
+    var linuxRequirements: List<LinuxRequirement>? by mutableStateOf(null)
         private set
+
+    var linuxHotkeyUnavailable: Boolean by mutableStateOf(false)
+        private set
+
+    var isMacAccessibilityWarningVisible: Boolean by mutableStateOf(false)
+        private set
+
+    val linuxMissingRequirements: List<LinuxRequirement>
+        get() =
+            linuxRequirements?.let {
+                LinuxRequirementChecker.displayedMissingRequirements(it, linuxHotkeyUnavailable)
+            } ?: emptyList()
+
+    val isSetupWarningVisible: Boolean
+        get() = linuxMissingRequirements.isNotEmpty() || isMacAccessibilityWarningVisible
 
     private val previewVisible = AtomicBoolean(false)
     private val opening = AtomicBoolean(false)
@@ -73,45 +95,58 @@ internal class ApplicationState(
         isSettingsVisible = false
     }
 
-    fun dismissPermissionWarning() {
-        isPermissionWarningVisible = false
+    fun dismissLinuxWarning() {
+        linuxRequirements = emptyList()
+        linuxHotkeyUnavailable = false
+    }
+
+    fun dismissMacWarning() {
+        isMacAccessibilityWarningVisible = false
     }
 
     fun reportPermissionMissing() {
-        isPermissionWarningVisible = true
+        if (isLinux()) {
+            linuxHotkeyUnavailable = true
+        } else {
+            isMacAccessibilityWarningVisible = true
+        }
     }
 
     @Suppress("TooGenericExceptionCaught")
     fun toggleWindow() {
-        val controller = arrangementController
-        if (controller == null) {
-            logger.info { "Window manager not ready yet, ignoring toggle" }
-            return
-        }
-        if (previewVisible.get()) {
-            updatePreviewVisibility(false)
-            logger.info("Preview window visible=false")
-            return
-        }
-        if (!opening.compareAndSet(false, true)) {
-            return
-        }
-        compositionScope.launch {
-            try {
-                try {
-                    withTimeoutOrNull(OPEN_CAPTURE_TIMEOUT_MS.milliseconds) {
-                        controller.captureTargetWindowOnIo()
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    logger.log(Level.WARNING, "Target capture failed, showing preview anyway", e)
-                }
-                updatePreviewVisibility(true)
-                logger.info("Preview window visible=true")
-            } finally {
-                opening.set(false)
+        when {
+            isSetupWarningVisible -> {
+                logger.info { "Ignoring toggle while a setup warning is visible" }
             }
+            arrangementController == null -> {
+                logger.info { "Window manager not ready yet, ignoring toggle" }
+            }
+            previewVisible.get() -> {
+                updatePreviewVisibility(false)
+                logger.info("Preview window visible=false")
+            }
+            opening.compareAndSet(false, true) -> {
+                compositionScope.launch { openPreviewWithCapture() }
+            }
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun openPreviewWithCapture() {
+        try {
+            try {
+                withTimeoutOrNull(OPEN_CAPTURE_TIMEOUT_MS.milliseconds) {
+                    arrangementController?.captureTargetWindowOnIo()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                logger.log(Level.WARNING, "Target capture failed, showing preview anyway", e)
+            }
+            updatePreviewVisibility(true)
+            logger.info("Preview window visible=true")
+        } finally {
+            opening.set(false)
         }
     }
 
@@ -122,6 +157,17 @@ internal class ApplicationState(
         }.onFailure {
             logger.log(Level.SEVERE, "Failed to initialize window manager", it)
         }
+    }
+
+    suspend fun checkLinuxRequirements() {
+        if (!isLinux() || e2eMode) {
+            linuxRequirements = emptyList()
+            return
+        }
+        linuxRequirements =
+            withContext(Dispatchers.IO) {
+                LinuxRequirementChecker.checkMissingRequirementsWithRetry()
+            }
     }
 
     suspend fun awaitShutdown() {
@@ -140,6 +186,7 @@ internal fun rememberApplicationState(
     shutdownChannel: Channel<Unit>,
     onReady: () -> Unit,
     onViewModelCreated: (SettingsViewModel) -> Unit,
+    e2eMode: Boolean = false,
 ): ApplicationState {
     val compositionScope = rememberCoroutineScope()
     val settingsViewModel =
@@ -160,6 +207,7 @@ internal fun rememberApplicationState(
             settingsRequestChannel = settingsRequestChannel,
             shutdownChannel = shutdownChannel,
             onReady = onReady,
+            e2eMode = e2eMode,
         )
     }
 }
