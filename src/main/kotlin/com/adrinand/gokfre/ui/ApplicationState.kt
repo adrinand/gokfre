@@ -22,6 +22,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Level
 import java.util.logging.Logger
+import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.ui.ApplicationState")
 
@@ -98,16 +99,12 @@ internal class ApplicationState(
         compositionScope.launch {
             try {
                 try {
-                    // Capture while the target still has focus; the preview only
-                    // takes focus once it is shown.
-                    withTimeoutOrNull(OPEN_CAPTURE_TIMEOUT_MS) {
+                    withTimeoutOrNull(OPEN_CAPTURE_TIMEOUT_MS.milliseconds) {
                         controller.captureTargetWindowOnIo()
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    // Never let a backend failure cancel the shared composition
-                    // scope (hotkey/autosave live there).
                     logger.log(Level.WARNING, "Target capture failed, showing preview anyway", e)
                 }
                 updatePreviewVisibility(true)
@@ -118,7 +115,7 @@ internal class ApplicationState(
         }
     }
 
-    suspend fun initializeWindowManager() {
+    fun initializeWindowManager() {
         runCatching {
             arrangementController = ArrangementController(createWindowManager())
             onReady()
