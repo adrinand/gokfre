@@ -60,7 +60,7 @@ class HeadlessWindowManager : WindowManager {
         timeoutMs: Long,
     ): Boolean = true
 
-    override suspend fun showPreview(
+    override suspend fun showAndFocusPreview(
         window: Window,
         targetWorkArea: Rectangle?,
         scope: CoroutineScope,

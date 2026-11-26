@@ -1,5 +1,9 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.awt.Rectangle
 import java.awt.Window
 import java.util.logging.Logger
@@ -60,9 +64,20 @@ class MacWindowManager internal constructor(
         source.raise(handle.pid)
     }
 
-    override suspend fun focusPreview(window: Window) {
-        focusAppWindow()
-        super.focusPreview(window)
+    override suspend fun showAndFocusPreview(
+        window: Window,
+        targetWorkArea: Rectangle?,
+        scope: CoroutineScope,
+    ) {
+        placePreviewForShow(window, targetWorkArea, scope)
+        runCatching {
+            focusAppWindow()
+            super.focusPreview(window)
+        }.onFailure {
+            if (it is CancellationException) {
+                currentCoroutineContext().ensureActive()
+            }
+        }.onFailure { logger.warning { "Preview focus failed: ${it.message}" } }
     }
 
     override suspend fun enterFullscreen(

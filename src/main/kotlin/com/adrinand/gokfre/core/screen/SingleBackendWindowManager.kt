@@ -83,7 +83,30 @@ abstract class SingleBackendWindowManager<H : WindowHandle> : WindowManager {
     }
 
     @Suppress("TooGenericExceptionCaught")
-    override suspend fun showPreview(
+    override suspend fun showAndFocusPreview(
+        window: Window,
+        targetWorkArea: Rectangle?,
+        scope: CoroutineScope,
+    ) {
+        placePreviewForShow(window, targetWorkArea, scope)
+        scope.launch {
+            val started = TimeSource.Monotonic.markNow()
+            try {
+                focusPreview(window)
+                logger.info { "Preview focus elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warning { "Preview focus failed: ${e.message}" }
+            }
+        }
+    }
+
+    /**
+     * Restores, moves, and maximizes [window] for the show path.
+     */
+    @Suppress("TooGenericExceptionCaught")
+    protected suspend fun placePreviewForShow(
         window: Window,
         targetWorkArea: Rectangle?,
         scope: CoroutineScope,

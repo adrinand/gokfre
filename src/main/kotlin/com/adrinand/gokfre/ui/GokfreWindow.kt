@@ -32,7 +32,6 @@ import com.adrinand.gokfre.core.hotkey.getDisplayCharFromKeyEvent
 import com.adrinand.gokfre.core.screen.ArrangementController
 import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.awt.Window
@@ -40,7 +39,6 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.ui.GokfreWindow")
 
@@ -217,23 +215,11 @@ fun GokfreWindow(
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
 
-        windowManager.showPreview(
+        windowManager.showAndFocusPreview(
             win,
             arrangementController.targetWorkArea ?: win.workAreaBounds(),
             this,
         )
-
-        launch {
-            val started = TimeSource.Monotonic.markNow()
-            try {
-                windowManager.focusPreview(win)
-                logger.info { "Preview focus elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                logger.warning { "Preview focus failed: ${e.message}" }
-            }
-        }
 
         alphaAnim.snapTo(0f)
         previewReady = true

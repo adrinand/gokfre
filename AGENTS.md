@@ -162,19 +162,21 @@ session bus. Design notes live here instead of in code comments.
 ### Preview focus and work areas
 
 - **Show-path ownership:** `GokfreWindow` only manages Compose state (fade,
-  key selection, focus requester). `WindowManager.showPreview` owns monitor
+  key selection, focus requester). `WindowManager.showAndFocusPreview` owns monitor
   tracking, placement, the bounds-drift guard, and the same-monitor maximize
   decision. `keepsPreviewMaximizedWhenHidden` defaults to `true`; X11 overrides it
   to `false` because some X11 WMs drop the maximized state across unmap. Platform
   quirks stay in backends: X11 configures the taskbar hint, macOS activates the
-  app in `focusPreview` before AWT focus (the AX call must run on the AWT thread),
-  and Linux ties `alwaysOnTop` to visibility.
+  app and requests AWT focus inside `showAndFocusPreview` before the reveal (the AX call
+  must run on the AWT thread), and Linux ties `alwaysOnTop` to visibility.
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and
   Compose focus. Make it focusable before mapping (`Window(focusable = true)`,
   `alwaysOnTop = visible`). On show, finish backend placement while the window is
   still transparent, then reveal immediately and run focus in the background; the
   100 ms fade-in masks the ~60 ms handoff, so the preview never waits on focus
-  confirmation. Placement/maximize must never gate an already visible window.
+  confirmation. macOS is the exception: it activates and focuses inside
+  `showAndFocusPreview` before the reveal, so the caller must not focus again. Placement/
+  maximize must never gate an already visible window.
 - **Target capture:** capture the active window once per open on
   `Dispatchers.IO` before the preview is shown, with a short timeout; if it
   fails, still show the preview and keep the previous target. Do not poll the
@@ -197,7 +199,7 @@ session bus. Design notes live here instead of in code comments.
   maximized on the previous monitor. Capture the logical work area in the same
   `CaptureActiveWindow` call to avoid an extra blocking `gdbus` call. Older
   extensions without logical work areas use client-side AWT placement instead.
-- `WindowManager.showPreview` records the preview's monitor only after placement
+- `WindowManager.showAndFocusPreview` records the preview's monitor only after placement
   succeeds; a failed move must be retried on the next open.
 - **Extension reloads:** GNOME Shell 45+ caches `extension.js`; disabling/enabling
   or `ReloadExtension` does not reload it. Log out/in after changing the GNOME
