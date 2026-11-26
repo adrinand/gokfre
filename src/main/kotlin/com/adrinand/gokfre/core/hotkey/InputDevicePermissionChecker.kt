@@ -1,5 +1,6 @@
 package com.adrinand.gokfre.core.hotkey
 
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -45,7 +46,10 @@ object InputDevicePermissionChecker {
                 .redirectErrorStream(true)
                 .start()
                 .run {
-                    waitFor(2, TimeUnit.SECONDS)
+                    if (!waitFor(2, TimeUnit.SECONDS)) {
+                        destroyForcibly()
+                        return null
+                    }
                     if (exitValue() == 0) inputStream.bufferedReader().readText().trim() else null
                 }
         } catch (_: Exception) {
@@ -53,7 +57,11 @@ object InputDevicePermissionChecker {
         }
 
     private fun canReadAnyInputDevice(inputDir: Path): Boolean =
-        Files.newDirectoryStream(inputDir, "event*").use { stream ->
-            stream.any { Files.isReadable(it) }
+        try {
+            Files.newDirectoryStream(inputDir, "event*").use { stream ->
+                stream.any { Files.isReadable(it) }
+            }
+        } catch (_: IOException) {
+            false
         }
 }

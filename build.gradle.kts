@@ -65,6 +65,9 @@ dependencies {
     // JUnit4 runtime (for @Test, @Rule)
     testImplementation("junit:junit:4.13.2")
 
+    // MockK for stubbing dependencies in unit tests
+    testImplementation(libs.mockk)
+
     // Allows JUnit4 tests to run on the JUnit5 platform
     testImplementation("org.junit.vintage:junit-vintage-engine:5.10.1")
 
@@ -180,6 +183,8 @@ kover {
                 classes(
                     "com.adrinand.gokfre.MainKt*",
                     "com.adrinand.gokfre.ComposableSingletons*",
+                    "com.adrinand.gokfre.ui.ApplicationState*",
+                    "com.adrinand.gokfre.ui.ApplicationRootKt*",
                     "com.adrinand.gokfre.core.screen.*",
                     "com.adrinand.gokfre.core.startup.*",
                     "com.adrinand.gokfre.core.hotkey.LinuxEvdevHotkeyProvider*",

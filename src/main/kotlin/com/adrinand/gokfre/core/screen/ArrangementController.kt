@@ -1,23 +1,14 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runInterruptible
 import java.awt.Rectangle
 import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.core.screen.ArrangementController")
-
 private const val FOCUS_SETTLE_DELAY_MS = 100L
-
-private fun WindowHandle?.format(): String =
-    when (this) {
-        null -> "null"
-        is WindowHandle.X11 -> "0x${id.toString(HEX_RADIX)}"
-        is WindowHandle.Wayland -> "wayland:$backend:$token"
-        is WindowHandle.Mac -> "mac:pid=$pid"
-    }
-
-private const val HEX_RADIX = 16
 
 /**
  * Orchestrates capturing the target window and applying a tiled bounds to it.
@@ -28,13 +19,19 @@ private const val HEX_RADIX = 16
 class ArrangementController(
     val windowManager: WindowManager,
 ) {
-    private var targetWindow: WindowHandle? = null
+    private data class CapturedTarget(
+        val window: WindowHandle?,
+        val workArea: Rectangle?,
+    )
+
+    @Volatile
+    private var capturedTarget = CapturedTarget(window = null, workArea = null)
 
     /**
      * Work area of the monitor that hosted the captured target window.
      */
-    var targetWorkArea: Rectangle? = null
-        private set
+    val targetWorkArea: Rectangle?
+        get() = capturedTarget.workArea
 
     /**
      * Captures the currently active window so subsequent [arrange] calls apply
@@ -42,10 +39,19 @@ class ArrangementController(
      */
     fun captureTargetWindow() {
         val window = windowManager.getActiveWindowId()
-        val bounds = window?.let { windowManager.getWindowBounds(it) }
-        targetWindow = window
-        targetWorkArea = window?.let { windowManager.getWorkArea(it, bounds) }
-        logger.info { "Captured target window: ${window.format()}, bounds=$bounds, workArea=$targetWorkArea" }
+        val workArea = window?.let { windowManager.getWorkArea(it, null) }
+        capturedTarget = CapturedTarget(window = window, workArea = workArea)
+        logger.info { "Captured target window: ${window?.format()}, workArea=$workArea" }
+    }
+
+    /**
+     * Captures the active window on [Dispatchers.IO] so the hotkey handler does
+     * not block the UI thread.
+     */
+    suspend fun captureTargetWindowOnIo() {
+        runInterruptible(Dispatchers.IO) {
+            captureTargetWindow()
+        }
     }
 
     /**
@@ -62,8 +68,9 @@ class ArrangementController(
         selectedKeys: List<String>,
         workArea: Rectangle,
     ): Rectangle? {
-        val window = targetWindow
-        val effectiveWorkArea = targetWorkArea ?: workArea
+        val target = capturedTarget
+        val window = target.window
+        val effectiveWorkArea = target.workArea ?: workArea
         val positions = if (window != null) findKeyPositions(keyLabels, selectedKeys) else emptyList()
         val bounds = computeSelectedBounds(rowWeights, columnWeights, positions, effectiveWorkArea)
 

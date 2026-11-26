@@ -1,5 +1,7 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.awt.Rectangle
 import java.awt.Window
 import java.util.logging.Logger
@@ -16,6 +18,14 @@ class MacWindowManager internal constructor(
 ) : SingleBackendWindowManager<WindowHandle.Mac>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacWindowManager")
 
+    private data class CapturedMacWindow(
+        val pid: Long,
+        val workArea: Rectangle?,
+    )
+
+    @Volatile
+    private var capturedWindow: CapturedMacWindow? = null
+
     constructor() : this(NativeMacWindowSource)
 
     override fun castHandle(window: WindowHandle): WindowHandle.Mac? = window as? WindowHandle.Mac
@@ -23,6 +33,23 @@ class MacWindowManager internal constructor(
     override fun retrieveActiveWindow(): WindowHandle.Mac? = buildMacHandle()
 
     override fun retrieveBounds(handle: WindowHandle.Mac): Rectangle? = source.windowBounds(handle.pid)
+
+    override fun getWorkArea(
+        window: WindowHandle,
+        bounds: Rectangle?,
+    ): Rectangle? {
+        val handle = window as? WindowHandle.Mac ?: return super.getWorkArea(window, bounds)
+        val cachedWorkArea =
+            if (bounds == null) {
+                capturedWindow?.takeIf { it.pid == handle.pid }?.workArea
+            } else {
+                null
+            }
+        return cachedWorkArea ?: run {
+            val effectiveBounds = bounds ?: source.windowBounds(handle.pid) ?: return null
+            awtWorkAreaForWindowBounds(effectiveBounds)
+        }
+    }
 
     override fun applyBounds(
         handle: WindowHandle.Mac,
@@ -33,6 +60,11 @@ class MacWindowManager internal constructor(
 
     override fun focusHandle(handle: WindowHandle.Mac) {
         source.raise(handle.pid)
+    }
+
+    override suspend fun focusPreview(window: Window) {
+        withContext(Dispatchers.IO) { focusAppWindow() }
+        super.focusPreview(window)
     }
 
     override suspend fun enterFullscreen(
@@ -60,11 +92,17 @@ class MacWindowManager internal constructor(
                 ?.takeIf { it != selfPid }
         if (pid == null) {
             logger.warning { "Could not determine the frontmost application or window" }
+            capturedWindow = null
             return null
         }
         if (focusedAppPid != pid) {
             logger.info { "Using fallback window pid=$pid (focused app pid=$rawFocusedAppPid)" }
         }
+        capturedWindow =
+            CapturedMacWindow(
+                pid = pid,
+                workArea = source.windowBounds(pid)?.let(::awtWorkAreaForWindowBounds),
+            )
         val title = if (focusedAppPid == pid) source.windowTitle(pid) ?: "" else ""
         return WindowHandle.Mac(pid = pid, title = title)
     }

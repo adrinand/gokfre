@@ -30,34 +30,31 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import com.adrinand.gokfre.core.hotkey.getDisplayCharFromKeyEvent
 import com.adrinand.gokfre.core.screen.ArrangementController
-import com.adrinand.gokfre.core.screen.focusAppWindow
-import com.adrinand.gokfre.core.screen.isLinux
-import com.adrinand.gokfre.core.screen.isX11Session
-import com.adrinand.gokfre.core.screen.skipTaskbarX11
 import com.adrinand.gokfre.core.screen.workAreaBounds
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.awt.Rectangle
 import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 private val logger = Logger.getLogger("com.adrinand.gokfre.ui.GokfreWindow")
 
 const val PREVIEW_WINDOW_TITLE = "Gokfre Preview"
 
-private const val SHOW_POLL_INTERVAL_MS = 16L
+private const val SHOW_POLL_INTERVAL_MS = 2L
 private const val MAX_SHOW_WAIT_MS = 500L
-private const val FULLSCREEN_WAIT_TIMEOUT_MS = 2_000L
 private const val FADE_IN_MS = 100
 private const val FADE_OUT_MS = 60
 private const val MAX_SELECTED_KEYS = 2
 private const val PREVIEW_OFFSCREEN_COORDINATE = -100_000
 private const val PREVIEW_HIDDEN_SIZE_DP = 1
 
+@Suppress("TooGenericExceptionCaught", "ThrowsCount")
 @Composable
 fun GokfreWindow(
     visible: Boolean,
@@ -68,9 +65,9 @@ fun GokfreWindow(
     var composeWindow by remember { mutableStateOf<ComposeWindow?>(null) }
     var previewReady by remember { mutableStateOf(false) }
     var selectedKeys by remember { mutableStateOf<List<String>>(emptyList()) }
-    var lastWorkArea by remember { mutableStateOf<Rectangle?>(null) }
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
+    val windowManager = arrangementController.windowManager
 
     val alphaAnim = remember { Animatable(0f) }
     val windowState =
@@ -78,7 +75,7 @@ fun GokfreWindow(
             position = WindowPosition.Absolute(PREVIEW_OFFSCREEN_COORDINATE.dp, PREVIEW_OFFSCREEN_COORDINATE.dp),
             size = DpSize(PREVIEW_HIDDEN_SIZE_DP.dp, PREVIEW_HIDDEN_SIZE_DP.dp),
         )
-    val alwaysOnTopFlag = if (isLinux()) visible else true
+    val alwaysOnTopFlag = windowManager.previewAlwaysOnTop(visible)
 
     LaunchedEffect(previewReady) {
         if (previewReady) {
@@ -151,9 +148,7 @@ fun GokfreWindow(
                 },
             )
 
-            if (isLinux() && isX11Session()) {
-                window.skipTaskbarX11()
-            }
+            windowManager.configurePreviewWindow(window)
 
             window.setOpacitySafely(0f)
         }
@@ -221,31 +216,25 @@ fun GokfreWindow(
         if (!win.isShowing) {
             logger.warning { "Preview window did not report isShowing after $waitedMs ms, continuing anyway" }
         }
-        val workArea = arrangementController.targetWorkArea ?: win.workAreaBounds()
-        val sameMonitor = lastWorkArea == workArea
-        if (!sameMonitor) {
-            win.bounds = workArea
-        }
-        win.isResizable = true
-        try {
-            if (sameMonitor) {
-                arrangementController.windowManager.focusPreview(win)
-                launch {
-                    arrangementController.windowManager.enterFullscreen(win, FULLSCREEN_WAIT_TIMEOUT_MS)
-                }
-                lastWorkArea = workArea
-            } else {
-                val placed =
-                    arrangementController.windowManager.placePreview(win, workArea, FULLSCREEN_WAIT_TIMEOUT_MS)
-                lastWorkArea = if (placed) workArea else null
-                arrangementController.windowManager.focusPreview(win)
+
+        windowManager.showPreview(
+            win,
+            arrangementController.targetWorkArea ?: win.workAreaBounds(),
+            this,
+        )
+
+        launch {
+            val started = TimeSource.Monotonic.markNow()
+            try {
+                windowManager.focusPreview(win)
+                logger.info { "Preview focus elapsedMs=${started.elapsedNow().inWholeMilliseconds}" }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.warning { "Preview focus failed: ${e.message}" }
             }
-        } finally {
-            win.isResizable = false
         }
-        if (!isLinux()) {
-            focusAppWindow()
-        }
+
         alphaAnim.snapTo(0f)
         previewReady = true
         win.setOpacitySafely(1f)

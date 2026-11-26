@@ -108,6 +108,7 @@ object E2EApplication {
                     startupLauncher = E2EStartupLauncher,
                     globalHotkeyProvider = hotkeyProvider,
                     toggleDispatcher = { it() },
+                    e2eMode = true,
                 )
             }
 

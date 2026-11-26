@@ -21,6 +21,7 @@ private const val MAXIMIZE_SETTLE_MS = 50L
 private const val CALL_TIMEOUT_MS = 300L
 private const val FOCUS_CALL_TIMEOUT_MS = 1_000L
 private const val FOCUS_RETRY_TIMEOUT_MS = 500L
+private const val AWT_FOCUS_GRACE_MS = 60L
 private const val PLACE_PREVIEW_ATTEMPTS = 5
 private const val BOUNDS_VALUE_COUNT = 4
 private const val X_INDEX = 0
@@ -137,6 +138,13 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
         timeoutMs: Long,
     ): Boolean =
         withContext(Dispatchers.IO) {
+            val alreadyMaximized =
+                callMethod("IsPreviewMaximized", timeoutMs = CALL_TIMEOUT_MS)
+                    ?.let { parseLeadingBoolean(it.trim()) } == true
+            if (alreadyMaximized) {
+                return@withContext true
+            }
+            logger.info { "Preview was not maximized; maximizing now" }
             val output = callMethod("MaximizePreview", timeoutMs = CALL_TIMEOUT_MS) ?: return@withContext false
             if (parseLeadingBoolean(output.trim()) != true) {
                 logger.warning { "GNOME extension did not maximize the preview" }
@@ -190,18 +198,37 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 false
             }
         if (!placed) {
-            // [bounds] is logical while AWT is in XWayland pixels; writing it
-            // client-side would move the preview to the wrong place.
             logger.warning { "GNOME extension could not place the preview; keeping its current bounds" }
         }
         return placed
     }
 
     override suspend fun focusPreview(window: Window) {
-        val focused =
+        val started = TimeSource.Monotonic.markNow()
+        var attempts = 0
+        val firstConfirmed =
+            withContext(Dispatchers.IO) {
+                attempts++
+                val output = callMethod("FocusPreview", timeoutMs = FOCUS_CALL_TIMEOUT_MS)
+                output != null && parseLeadingBoolean(output.trim()) == true
+            }
+        if (firstConfirmed) {
+            val elapsedMs = started.elapsedNow().inWholeMilliseconds
+            logger.info { "GNOME focus confirmed attempts=$attempts elapsedMs=$elapsedMs" }
+            return
+        }
+        super.focusPreview(window)
+        delay(AWT_FOCUS_GRACE_MS.milliseconds)
+        if (window.isFocused) {
+            val elapsedMs = started.elapsedNow().inWholeMilliseconds
+            logger.info { "GNOME focus confirmed via AWT attempts=$attempts elapsedMs=$elapsedMs" }
+            return
+        }
+        val confirmed =
             withContext(Dispatchers.IO) {
                 val deadline = TimeSource.Monotonic.markNow() + FOCUS_RETRY_TIMEOUT_MS.milliseconds
                 while (deadline.hasNotPassedNow()) {
+                    attempts++
                     val output = callMethod("FocusPreview", timeoutMs = FOCUS_CALL_TIMEOUT_MS)
                     if (output != null && parseLeadingBoolean(output.trim()) == true) {
                         return@withContext true
@@ -210,8 +237,11 @@ class GnomeWindowManager : SingleBackendWindowManager<WindowHandle.Wayland>() {
                 }
                 false
             }
-        if (!focused) {
-            logger.info { "GNOME extension did not confirm preview focus; using AWT activation" }
+        val elapsedMs = started.elapsedNow().inWholeMilliseconds
+        if (confirmed) {
+            logger.info { "GNOME focus confirmed attempts=$attempts elapsedMs=$elapsedMs" }
+        } else {
+            logger.info { "GNOME focus not confirmed attempts=$attempts elapsedMs=$elapsedMs; using AWT activation" }
             super.focusPreview(window)
         }
     }

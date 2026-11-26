@@ -69,23 +69,32 @@ object Dbus {
         command: List<String>,
         timeoutMs: Long = PROCESS_TIMEOUT_MILLISECONDS,
     ): String? {
+        var process: Process? = null
         return try {
-            val process =
+            val started =
                 ProcessBuilder(command)
                     .redirectErrorStream(true)
                     .start()
-            val output = process.inputStream.bufferedReader().readText()
-            val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-            if (!finished || process.exitValue() != 0) {
+            process = started
+
+            if (!started.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
+                started.destroyForcibly()
+                logger.fine { "${command.joinToString(" ")} timed out after $timeoutMs ms" }
+                return null
+            }
+            val output = started.inputStream.bufferedReader().readText()
+            if (started.exitValue() != 0) {
                 logger.fine { "${command.joinToString(" ")} failed: $output" }
                 null
             } else {
                 output
             }
         } catch (e: IOException) {
+            process?.destroyForcibly()
             logger.fine { "${command.joinToString(" ")} threw: ${e.message}" }
             null
         } catch (e: InterruptedException) {
+            process?.destroyForcibly()
             Thread.currentThread().interrupt()
             logger.fine { "${command.joinToString(" ")} interrupted" }
             null

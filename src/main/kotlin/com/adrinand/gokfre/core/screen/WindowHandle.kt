@@ -1,5 +1,7 @@
 package com.adrinand.gokfre.core.screen
 
+private const val HEX_RADIX = 16
+
 /**
  * Platform-neutral reference to a window.
  *
@@ -30,4 +32,14 @@ sealed class WindowHandle {
      * operations are performed on the focused window of the captured process.
      */
     data class Mac(val pid: Long, val title: String = "") : WindowHandle()
+
+    /**
+     * Returns the display name of the window.
+     */
+    fun format(): String =
+        when (this) {
+            is WindowHandle.X11 -> "0x${id.toString(HEX_RADIX)}"
+            is WindowHandle.Wayland -> "wayland:$backend:$token"
+            is WindowHandle.Mac -> "mac:pid=$pid"
+        }
 }

@@ -25,5 +25,10 @@ class AppStartupTest {
         e2e.app.triggerToggle()
         val closed = waitForPreviewClosed()
         check(closed) { "Preview window did not close after second toggle" }
+
+        e2e.app.triggerToggle()
+        val reopened = waitForPreviewWindow()
+        check(reopened != null) { "Preview window did not reappear after third toggle" }
+        check(reopened === preview) { "Preview window should be reused across toggles" }
     }
 }

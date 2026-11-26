@@ -1,7 +1,7 @@
 ---
 description: Security reviewer for gokfre. Focuses on native interop, permissions, file handling, and serialization risks.
 mode: subagent
-model: opencode/deepseek-v4.1-flash-free
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: deny
   bash: deny

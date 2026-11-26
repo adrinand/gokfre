@@ -1,7 +1,7 @@
 ---
 description: Fresh-context code reviewer for gokfre. Reads the diff against AGENTS.md and REVIEW.md and posts findings.
 mode: subagent
-model: opencode/deepseek-v4.1-flash-free
+model: opencode-go/deepseek-v4.1-flash
 permission:
   edit: deny
   bash: deny
