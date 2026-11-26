@@ -45,6 +45,10 @@ internal data class KdeScriptReply(
     val y: Int = 0,
     val width: Int = 0,
     val height: Int = 0,
+    val workAreaX: Int? = null,
+    val workAreaY: Int? = null,
+    val workAreaWidth: Int? = null,
+    val workAreaHeight: Int? = null,
     val maximized: Boolean = false,
 )
 

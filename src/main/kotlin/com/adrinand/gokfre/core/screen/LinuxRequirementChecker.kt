@@ -87,7 +87,7 @@ object LinuxRequirementChecker {
         return missingRequirements()
     }
 
-    internal fun displayeMissingdRequirements(
+    internal fun displayedMissingRequirements(
         detected: List<LinuxRequirement>,
         hotkeyListenerFailed: Boolean,
     ): List<LinuxRequirement> =

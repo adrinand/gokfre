@@ -106,6 +106,24 @@
         };
     }
 
+    function workArea(window) {
+        try {
+            var rect = workspace.clientArea(
+                KWin.PlacementArea,
+                window.screen,
+                workspace.currentDesktop
+            );
+            return {
+                x: Math.round(rect.x),
+                y: Math.round(rect.y),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height)
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
     function report(result) {
         try {
             callDBus(
@@ -130,7 +148,8 @@
             return;
         }
         var geometry = frameGeometry(window);
-        report({
+        var area = workArea(window);
+        var result = {
             ok: true,
             id: typeof window.internalId !== 'undefined' ? String(window.internalId) : '',
             title: window.caption || '',
@@ -138,7 +157,14 @@
             y: geometry.y,
             width: geometry.width,
             height: geometry.height
-        });
+        };
+        if (area) {
+            result.workAreaX = area.x;
+            result.workAreaY = area.y;
+            result.workAreaWidth = area.width;
+            result.workAreaHeight = area.height;
+        }
+        report(result);
     }
 
     function focus() {

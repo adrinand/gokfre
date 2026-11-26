@@ -161,27 +161,44 @@ session bus. Design notes live here instead of in code comments.
 
 ### Preview focus and work areas
 
+- **Show-path ownership:** `GokfreWindow` only manages Compose state (fade,
+  key selection, focus requester). `WindowManager.showPreview` owns monitor
+  tracking, placement, the bounds-drift guard, and the same-monitor maximize
+  decision. `keepsPreviewMaximizedWhenHidden` defaults to `true`; X11 overrides it
+  to `false` because some X11 WMs drop the maximized state across unmap. Platform
+  quirks stay in backends: X11 configures the taskbar hint,
+  macOS activates the app before AWT focus, and Linux ties `alwaysOnTop` to
+  visibility.
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and
   Compose focus. Make it focusable before mapping (`Window(focusable = true)`,
-  `alwaysOnTop = visible`), focus it right after `isShowing`, then re-assert
-  focus after placement. Placement/maximize must never gate keyboard focus.
+  `alwaysOnTop = visible`). On show, finish backend placement while the window is
+  still transparent, then reveal immediately and run focus in the background; the
+  100 ms fade-in masks the ~60 ms handoff, so the preview never waits on focus
+  confirmation. Placement/maximize must never gate an already visible window.
+- **Target capture:** capture the active window once per open on
+  `Dispatchers.IO` before the preview is shown, with a short timeout; if it
+  fails, still show the preview and keep the previous target. Do not poll the
+  active window in the background: it costs IPC and can capture gokfre's own
+  preview.
 - On GNOME, `FocusPreview` uses `Main.activateWindow` with a roundtrip timestamp
-  and returns `preview.has_focus()`; the app retries for ~500 ms before falling
-  back to AWT. Shell-side activation is required because `arrange()` just
-  activated the target app, so Mutter's focus-stealing prevention blocks AWT
-  activation; do not call AWT `toFront()`/`requestFocus()` after it.
+  and returns `preview.has_focus()`; the app retries for ~500 ms in the
+  background before falling back to AWT. Shell-side activation is required
+  because `arrange()` just activated the target app, so Mutter's focus-stealing
+  prevention blocks AWT activation; do not call AWT `toFront()`/`requestFocus()`
+  after it.
 - **Coordinate spaces:** AWT/XWayland can report native pixels when JVM UI scaling
   is off (common in E2E), while GNOME and KWin compositor APIs use logical
   coordinates. `WindowManager.getWorkArea(window, bounds)` must return the
-  backend's own work area; `awtWorkAreaForWindowBounds` is AWT-space only. KDE
-  currently inherits the AWT fallback and needs a backend override on HiDPI.
+  backend's own work area; `awtWorkAreaForWindowBounds` is AWT-space only. GNOME
+  and KDE report the work area during capture; X11 and macOS resolve it from the
+  captured bounds.
 - On GNOME, place the preview shell-side (atomic unmaximize + move + maximize);
   client-side moves of a maximized window race the WM and can leave the preview
   maximized on the previous monitor. Capture the logical work area in the same
   `CaptureActiveWindow` call to avoid an extra blocking `gdbus` call. Older
   extensions without logical work areas use client-side AWT placement instead.
-- Only record the preview's monitor after placement succeeds; a failed move must
-  be retried on the next open.
+- `WindowManager.showPreview` records the preview's monitor only after placement
+  succeeds; a failed move must be retried on the next open.
 - **Extension reloads:** GNOME Shell 45+ caches `extension.js`; disabling/enabling
   or `ReloadExtension` does not reload it. Log out/in after changing the GNOME
   extension before testing new D-Bus methods. Older extensions may lack
