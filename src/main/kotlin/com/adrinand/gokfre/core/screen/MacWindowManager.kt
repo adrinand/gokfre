@@ -64,16 +64,12 @@ class MacWindowManager internal constructor(
         source.raise(handle.pid)
     }
 
-    // Overrides the whole show path: macOS must activate before the reveal,
-    // so focus cannot be deferred to the base background launch.
     override suspend fun showAndFocusPreview(
         window: Window,
         targetWorkArea: Rectangle?,
         scope: CoroutineScope,
     ) {
         placePreviewForShow(window, targetWorkArea, scope)
-        // macOS ignores AWT focus while the app is in the background, so
-        // activate and focus before the caller reveals the window.
         runCatching {
             focusAppWindow()
             super.focusPreview(window)
