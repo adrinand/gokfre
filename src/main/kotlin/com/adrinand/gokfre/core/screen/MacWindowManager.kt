@@ -1,8 +1,5 @@
 package com.adrinand.gokfre.core.screen
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.awt.Rectangle
 import java.awt.Window
 import java.util.logging.Logger
@@ -63,13 +60,9 @@ class MacWindowManager internal constructor(
         source.raise(handle.pid)
     }
 
-    override suspend fun showPreview(
-        window: Window,
-        targetWorkArea: Rectangle?,
-        scope: CoroutineScope,
-    ) {
-        super.showPreview(window, targetWorkArea, scope)
-        withContext(Dispatchers.IO) { focusAppWindow() }
+    override suspend fun focusPreview(window: Window) {
+        focusAppWindow()
+        super.focusPreview(window)
     }
 
     override suspend fun enterFullscreen(
