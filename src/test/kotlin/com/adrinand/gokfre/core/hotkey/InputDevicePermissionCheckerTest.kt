@@ -57,6 +57,18 @@ class InputDevicePermissionCheckerTest {
     }
 
     @Test
+    fun `Linux without input group and missing input directory denies access`() {
+        withTempDir { uinput, input ->
+            InputDevicePermissionChecker.hasAccess(
+                osName = LINUX_OS,
+                userGroupNames = { "user" },
+                uinputPath = uinput,
+                inputDir = input.resolve("missing"),
+            ) shouldBe false
+        }
+    }
+
+    @Test
     fun `Linux with missing uinput denies access`() {
         withTempDir { _, input ->
             InputDevicePermissionChecker.hasAccess(
