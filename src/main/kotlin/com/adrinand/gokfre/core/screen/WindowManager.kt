@@ -107,12 +107,14 @@ interface WindowManager {
     }
 
     /**
-     * Prepares [window] for display on [targetWorkArea]. Placement (restore,
-     * move, maximize) finishes before this returns so the caller can reveal the
-     * window without intermediate states. Any post-reveal maximize re-assert is
-     * scheduled on [scope].
+     * Prepares [window] for display on [targetWorkArea] and requests focus.
+     * Placement (restore, move, maximize) finishes before this returns so the
+     * caller can reveal the window without intermediate states. Focus normally
+     * runs in the background; backends that must activate before the reveal
+     * focus synchronously. Any post-reveal maximize re-assert is scheduled on
+     * [scope].
      */
-    suspend fun showPreview(
+    suspend fun showAndFocusPreview(
         window: Window,
         targetWorkArea: Rectangle?,
         scope: CoroutineScope,
