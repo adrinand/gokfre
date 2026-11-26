@@ -61,8 +61,6 @@ class MacWindowManager internal constructor(
     }
 
     override suspend fun focusPreview(window: Window) {
-        // AXFrontmost must run on the AWT thread; off-thread it reports success
-        // without actually making the app key.
         focusAppWindow()
         super.focusPreview(window)
     }
