@@ -1,9 +1,13 @@
 package com.adrinand.gokfre.core.screen
 
 import io.kotest.matchers.shouldBe
+import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Test
+import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 
+@Suppress("TooManyFunctions")
 class MacWindowManagerTest {
     private val selfPid = ProcessHandle.current().pid()
     private val focusedAppPid = selfPid + 1000
@@ -114,6 +118,42 @@ class MacWindowManagerTest {
 
         manager.getWindowBounds(WindowHandle.Mac(pid = arrangePid)) shouldBe expected
     }
+
+    @Test
+    fun `caches the work area of the captured window`() {
+        val bounds = Rectangle(100, 200, 800, 600)
+        assumeFalse("Skipping: headless environment", GraphicsEnvironment.isHeadless())
+        val expected = awtWorkAreaForWindowBounds(bounds)
+        assumeTrue("Skipping: no screen matches the bounds", expected != null)
+
+        val source =
+            FakeMacWindowSource(
+                focusedAppPid = focusedAppPid,
+                currentWindowBounds = bounds,
+            )
+        val manager = MacWindowManager(source)
+        val handle = manager.getActiveWindowId()
+        val callsAfterCapture = source.windowBoundsCalls
+
+        manager.getWorkArea(handle!!, null) shouldBe expected
+        source.windowBoundsCalls shouldBe callsAfterCapture
+    }
+
+    @Test
+    fun `falls back to the window bounds when the pid was not captured`() {
+        val source =
+            FakeMacWindowSource(
+                focusedAppPid = focusedAppPid,
+                currentWindowBounds = Rectangle(0, 0, 800, 600),
+            )
+        val manager = MacWindowManager(source)
+        manager.getActiveWindowId()
+        val callsAfterCapture = source.windowBoundsCalls
+
+        manager.getWorkArea(WindowHandle.Mac(pid = arrangePid), null)
+
+        source.windowBoundsCalls shouldBe callsAfterCapture + 1
+    }
 }
 
 private class FakeMacWindowSource(
@@ -126,6 +166,8 @@ private class FakeMacWindowSource(
 ) : MacWindowSource {
     var bounds: Pair<Long, Rectangle>? = null
     var raisedPid: Long? = null
+    var windowBoundsCalls: Int = 0
+        private set
 
     override fun focusedApplicationPid(): Long? = focusedAppPid
 
@@ -137,7 +179,10 @@ private class FakeMacWindowSource(
 
     override fun windowTitle(pid: Long): String? = titles[pid]
 
-    override fun windowBounds(pid: Long): Rectangle? = currentWindowBounds
+    override fun windowBounds(pid: Long): Rectangle? {
+        windowBoundsCalls++
+        return currentWindowBounds
+    }
 
     override fun setBounds(
         pid: Long,

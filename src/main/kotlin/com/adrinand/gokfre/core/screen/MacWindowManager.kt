@@ -18,11 +18,13 @@ class MacWindowManager internal constructor(
 ) : SingleBackendWindowManager<WindowHandle.Mac>() {
     override val logger: Logger = Logger.getLogger("com.adrinand.gokfre.core.screen.MacWindowManager")
 
-    @Volatile
-    private var missingWindowLogged = false
+    private data class CapturedMacWindow(
+        val pid: Long,
+        val workArea: Rectangle?,
+    )
 
     @Volatile
-    private var fallbackWindowLogged = false
+    private var capturedWindow: CapturedMacWindow? = null
 
     constructor() : this(NativeMacWindowSource)
 
@@ -37,8 +39,16 @@ class MacWindowManager internal constructor(
         bounds: Rectangle?,
     ): Rectangle? {
         val handle = window as? WindowHandle.Mac ?: return super.getWorkArea(window, bounds)
-        val effectiveBounds = bounds ?: source.windowBounds(handle.pid) ?: return null
-        return awtWorkAreaForWindowBounds(effectiveBounds)
+        val cachedWorkArea =
+            if (bounds == null) {
+                capturedWindow?.takeIf { it.pid == handle.pid }?.workArea
+            } else {
+                null
+            }
+        return cachedWorkArea ?: run {
+            val effectiveBounds = bounds ?: source.windowBounds(handle.pid) ?: return null
+            awtWorkAreaForWindowBounds(effectiveBounds)
+        }
     }
 
     override fun applyBounds(
@@ -81,21 +91,18 @@ class MacWindowManager internal constructor(
             (focusedAppPid ?: focusedElementPid ?: source.frontmostWindowPid(selfPid))
                 ?.takeIf { it != selfPid }
         if (pid == null) {
-            if (!missingWindowLogged) {
-                logger.warning { "Could not determine the frontmost application or window" }
-                missingWindowLogged = true
-            }
+            logger.warning { "Could not determine the frontmost application or window" }
+            capturedWindow = null
             return null
         }
-        missingWindowLogged = false
         if (focusedAppPid != pid) {
-            if (!fallbackWindowLogged) {
-                logger.info { "Using fallback window pid=$pid (focused app pid=$rawFocusedAppPid)" }
-                fallbackWindowLogged = true
-            }
-        } else {
-            fallbackWindowLogged = false
+            logger.info { "Using fallback window pid=$pid (focused app pid=$rawFocusedAppPid)" }
         }
+        capturedWindow =
+            CapturedMacWindow(
+                pid = pid,
+                workArea = source.windowBounds(pid)?.let(::awtWorkAreaForWindowBounds),
+            )
         val title = if (focusedAppPid == pid) source.windowTitle(pid) ?: "" else ""
         return WindowHandle.Mac(pid = pid, title = title)
     }

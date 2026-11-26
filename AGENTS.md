@@ -189,9 +189,9 @@ session bus. Design notes live here instead of in code comments.
 - **Coordinate spaces:** AWT/XWayland can report native pixels when JVM UI scaling
   is off (common in E2E), while GNOME and KWin compositor APIs use logical
   coordinates. `WindowManager.getWorkArea(window, bounds)` must return the
-  backend's own work area; `awtWorkAreaForWindowBounds` is AWT-space only. GNOME
-  and KDE report the work area during capture; X11 and macOS resolve it from the
-  captured bounds.
+  backend's own work area; `awtWorkAreaForWindowBounds` is AWT-space only. GNOME,
+  KDE, and macOS report or cache the work area during capture; X11 resolves it
+  from the captured bounds.
 - On GNOME, place the preview shell-side (atomic unmaximize + move + maximize);
   client-side moves of a maximized window race the WM and can leave the preview
   maximized on the previous monitor. Capture the logical work area in the same
