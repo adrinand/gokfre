@@ -1,5 +1,6 @@
 package com.adrinand.gokfre.core.screen
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.Rectangle
@@ -62,9 +63,15 @@ class MacWindowManager internal constructor(
         source.raise(handle.pid)
     }
 
-    override suspend fun focusPreview(window: Window) {
+    override suspend fun showPreview(
+        window: Window,
+        targetWorkArea: Rectangle?,
+        scope: CoroutineScope,
+    ) {
+        super.showPreview(window, targetWorkArea, scope)
+        // Activate before the caller reveals the window and requests Compose
+        // focus; macOS ignores focus requests while the app is in the background.
         withContext(Dispatchers.IO) { focusAppWindow() }
-        super.focusPreview(window)
     }
 
     override suspend fun enterFullscreen(
