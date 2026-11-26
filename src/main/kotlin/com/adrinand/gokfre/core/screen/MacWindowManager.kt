@@ -69,8 +69,6 @@ class MacWindowManager internal constructor(
         scope: CoroutineScope,
     ) {
         super.showPreview(window, targetWorkArea, scope)
-        // Activate before the caller reveals the window and requests Compose
-        // focus; macOS ignores focus requests while the app is in the background.
         withContext(Dispatchers.IO) { focusAppWindow() }
     }
 
