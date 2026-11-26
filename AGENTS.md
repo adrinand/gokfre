@@ -166,15 +166,17 @@ session bus. Design notes live here instead of in code comments.
   tracking, placement, the bounds-drift guard, and the same-monitor maximize
   decision. `keepsPreviewMaximizedWhenHidden` defaults to `true`; X11 overrides it
   to `false` because some X11 WMs drop the maximized state across unmap. Platform
-  quirks stay in backends: X11 configures the taskbar hint,
-  macOS activates the app before AWT focus, and Linux ties `alwaysOnTop` to
-  visibility.
+  quirks stay in backends: X11 configures the taskbar hint, macOS activates the
+  app inside `showPreview` (on `Dispatchers.IO`) before the reveal so AWT focus
+  can take effect, and Linux ties `alwaysOnTop` to visibility.
 - **Focus layers:** the preview needs compositor focus, AWT window focus, and
   Compose focus. Make it focusable before mapping (`Window(focusable = true)`,
   `alwaysOnTop = visible`). On show, finish backend placement while the window is
   still transparent, then reveal immediately and run focus in the background; the
   100 ms fade-in masks the ~60 ms handoff, so the preview never waits on focus
   confirmation. Placement/maximize must never gate an already visible window.
+  macOS is the exception: it activates the app during `showPreview`, still before
+  reveal, because macOS ignores AWT focus requests from a background app.
 - **Target capture:** capture the active window once per open on
   `Dispatchers.IO` before the preview is shown, with a short timeout; if it
   fails, still show the preview and keep the previous target. Do not poll the
