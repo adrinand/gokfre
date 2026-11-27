@@ -11,13 +11,10 @@ val defaultVersion = "1.0.0"
 val appVersion = providers.gradleProperty("version").orElse(defaultVersion).get()
 version = appVersion
 
-// Native packages reject '-'. RCs use '~' for deb/rpm; macOS keeps the
-// numeric base version because Apple does not allow suffixes.
 val rcMatch = Regex("""^(\d+\.\d+\.\d+)-rc(\.\d+)?$""").matchEntire(appVersion)
 val baseVersion = rcMatch?.groupValues?.get(1) ?: appVersion
 val rcSuffix = rcMatch?.groupValues?.get(2).orEmpty()
 val nativeLinuxVersion = if (rcMatch != null) "$baseVersion~rc$rcSuffix" else appVersion
-
 val isLinux = System.getProperty("os.name").lowercase().contains("linux")
 
 plugins {
