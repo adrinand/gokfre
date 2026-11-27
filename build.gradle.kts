@@ -6,8 +6,15 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.adrinand"
-version = "1.0.0"
 
+val defaultVersion = "1.0.0"
+val appVersion = providers.gradleProperty("version").orElse(defaultVersion).get()
+version = appVersion
+
+val rcMatch = Regex("""^(\d+\.\d+\.\d+)-rc(\.\d+)?$""").matchEntire(appVersion)
+val baseVersion = rcMatch?.groupValues?.get(1) ?: appVersion
+val rcSuffix = rcMatch?.groupValues?.get(2).orEmpty()
+val nativeLinuxVersion = if (rcMatch != null) "$baseVersion~rc$rcSuffix" else appVersion
 val isLinux = System.getProperty("os.name").lowercase().contains("linux")
 
 plugins {
@@ -136,7 +143,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "gokfre"
-            packageVersion = version.toString()
+            packageVersion = baseVersion
             description = "A keyboard-driven tiling window manager"
             copyright = "© 2026 adrinand"
             vendor = "adrinand"
@@ -144,6 +151,7 @@ compose.desktop {
             macOS {
                 bundleID = "com.adrinand.gokfre"
                 iconFile.set(project.file("src/main/resources/gokfre.icns"))
+                dmgPackageVersion = baseVersion
                 infoPlist {
                     extraKeysRawXml =
                         """
@@ -155,6 +163,8 @@ compose.desktop {
 
             linux {
                 iconFile.set(project.file("src/main/resources/gokfre.png"))
+                debPackageVersion = nativeLinuxVersion
+                rpmPackageVersion = nativeLinuxVersion
             }
         }
     }

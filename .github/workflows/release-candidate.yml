@@ -1,0 +1,208 @@
+name: Release Candidate
+
+# Builds installable packages from any branch and publishes them as a
+# GitHub prerelease. The version is the committed version plus "-rc".
+# Stable releases stay on CD, which runs only for main.
+on:
+  workflow_dispatch:
+
+run-name: "Release Candidate: ${{ github.ref_name }} @ ${{ github.sha }}"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Resolve release candidate version
+        id: resolve
+        run: |
+          set -euo pipefail
+          BASE=$(./gradlew -q printVersion)
+          if ! [[ "$BASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Project version '$BASE' must be a stable X.Y.Z." >&2
+            exit 1
+          fi
+
+          VERSION="${BASE}-rc"
+          TAG="v${VERSION}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists" >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "### Release candidate \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source: \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+
+  build-macos-arm:
+    runs-on: macos-latest
+    needs: [version]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Build DMG
+        uses: ./.github/actions/build-dmg
+        with:
+          version: ${{ needs.version.outputs.version }}
+          artifact-name: macos-arm64-dmg
+
+  build-macos-intel:
+    runs-on: macos-15-intel
+    needs: [version]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Build DMG
+        uses: ./.github/actions/build-dmg
+        with:
+          version: ${{ needs.version.outputs.version }}
+          artifact-name: macos-intel-dmg
+
+  build-linux-x64:
+    runs-on: ubuntu-latest
+    needs: [version]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot libfuse2
+
+      - name: Build .deb and .rpm
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: ./gradlew -Pversion="$VERSION" packageDeb packageRpm
+
+      - name: Build AppImage
+        id: appimage
+        uses: ./.github/actions/build-appimage
+        with:
+          version: ${{ needs.version.outputs.version }}
+
+      - name: Collect artifacts
+        env:
+          APPIMAGE: ${{ steps.appimage.outputs.appimage-path }}
+        run: |
+          mkdir -p build/artifacts
+          cp build/compose/binaries/main/deb/*.deb build/artifacts/
+          cp build/compose/binaries/main/rpm/*.rpm build/artifacts/
+          cp "$APPIMAGE" build/artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-artifacts
+          path: build/artifacts/*
+
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    needs: [version]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
+      - name: Build AppImage
+        id: appimage
+        uses: ./.github/actions/build-appimage
+        with:
+          version: ${{ needs.version.outputs.version }}
+
+      - name: Collect artifacts
+        env:
+          APPIMAGE: ${{ steps.appimage.outputs.appimage-path }}
+        run: |
+          mkdir -p build/artifacts
+          cp "$APPIMAGE" build/artifacts/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-appimage
+          path: build/artifacts/*.AppImage
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [version, build-macos-arm, build-macos-intel, build-linux-x64, build-linux-arm64]
+    # Configure required reviewers on this environment in Settings > Environments.
+    environment: release-candidate
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -R artifacts
+
+      - name: Create GitHub prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ needs.version.outputs.tag }}
+          draft: false
+          prerelease: true
+          make_latest: false
+          generate_release_notes: true
+          files: artifacts/*
+          fail_on_unmatched_files: true

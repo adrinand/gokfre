@@ -37,15 +37,24 @@ runs:
 
     - name: Build DMG
       shell: bash
-      run: ./gradlew packageDmg
+      env:
+        VERSION: ${{ inputs.version }}
+      run: ./gradlew -Pversion="$VERSION" packageDmg
 
     - name: Rename artifact
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
       run: |
         mkdir -p build/artifacts
         ARCH="$(uname -m)"
-        cp "build/compose/binaries/main/dmg/Gokfre-${{ inputs.version }}.dmg" \
-           "build/artifacts/Gokfre-${{ inputs.version }}-${ARCH}.dmg"
+        shopt -s nullglob
+        DMGS=(build/compose/binaries/main/dmg/*.dmg)
+        if [ ${#DMGS[@]} -eq 0 ]; then
+          echo "No DMG found under build/compose/binaries/main/dmg" >&2
+          exit 1
+        fi
+        cp "${DMGS[0]}" "build/artifacts/Gokfre-${VERSION}-${ARCH}.dmg"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
