@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
+import com.adrinand.gokfre.core.screen.isMac
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 
 private const val SETTINGS_WINDOW_WIDTH_DP = 800
@@ -23,7 +24,9 @@ fun SettingsWindow(
         onCloseRequest = onClose,
         title = "Gokfre Settings",
         state = rememberWindowState(width = SETTINGS_WINDOW_WIDTH_DP.dp, height = SETTINGS_WINDOW_HEIGHT_DP.dp),
+        alwaysOnTop = isMac(),
     ) {
+        MacUtilityWindowActivation(window)
         SettingsScreen(viewModel)
     }
 }
