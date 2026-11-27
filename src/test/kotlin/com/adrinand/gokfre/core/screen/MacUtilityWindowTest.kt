@@ -7,12 +7,12 @@ import java.awt.GraphicsEnvironment
 
 class MacUtilityWindowTest {
     @Test
-    fun `configureMacUtilityWindow is a no-op outside macOS`() {
+    fun `configureUtilityWindow is a no-op outside macOS`() {
         assumeFalse("Skipping: macOS behavior", isMac())
         assumeFalse("Skipping: headless environment", GraphicsEnvironment.isHeadless())
         val frame = Frame()
         try {
-            configureMacUtilityWindow(frame)
+            MacWindowManager.configureUtilityWindow(frame)
         } finally {
             frame.dispose()
         }
