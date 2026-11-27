@@ -179,8 +179,8 @@ session bus. Design notes live here instead of in code comments.
   maximize must never gate an already visible window.
 - **macOS utility windows:** Gokfre is packaged as an `LSUIElement` agent, so
   macOS does not activate it or raise a newly created window; settings and warning
-  windows can open behind the active Space's windows. `MacWindowManager`
-  exposes `configureUtilityWindow`, which activates the app, calls `toFront`/
+  windows can open behind the active Space's windows. `MacUtilityWindowActivator`
+  (created early in `ApplicationState`) activates the app, calls `toFront`/
   `requestFocus`, and sets
   `NSWindowCollectionBehaviorMoveToActiveSpace | Transient`; the preview has its
   own path in `showAndFocusPreview`. Reaching the native window uses JDK-internal

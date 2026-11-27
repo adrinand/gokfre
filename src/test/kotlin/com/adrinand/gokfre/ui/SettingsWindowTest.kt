@@ -28,7 +28,12 @@ class SettingsWindowTest {
         composeTestRule.setContent {
             val coroutineScope = rememberCoroutineScope()
             val viewModel = remember { SettingsViewModel(coroutineScope) }
-            SettingsWindow(isVisible = true, onClose = {}, viewModel = viewModel)
+            SettingsWindow(
+                isVisible = true,
+                onClose = {},
+                viewModel = viewModel,
+                utilityWindowActivator = null,
+            )
         }
         composeTestRule.waitForIdle()
 
@@ -40,7 +45,12 @@ class SettingsWindowTest {
         composeTestRule.setContent {
             val coroutineScope = rememberCoroutineScope()
             val viewModel = remember { SettingsViewModel(coroutineScope) }
-            SettingsWindow(isVisible = false, onClose = {}, viewModel = viewModel)
+            SettingsWindow(
+                isVisible = false,
+                onClose = {},
+                viewModel = viewModel,
+                utilityWindowActivator = null,
+            )
         }
         composeTestRule.waitForIdle()
 

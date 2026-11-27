@@ -2,8 +2,7 @@ package com.adrinand.gokfre.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import com.adrinand.gokfre.core.screen.MacWindowManager
-import com.adrinand.gokfre.core.screen.isMac
+import com.adrinand.gokfre.core.screen.MacUtilityWindowActivator
 import java.awt.Window
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
@@ -12,22 +11,23 @@ import java.awt.event.WindowEvent
 @Composable
 internal fun MacUtilityWindowActivation(
     window: Window,
-    onActivate: (Window) -> Unit = { MacWindowManager.configureUtilityWindow(it) },
+    activator: MacUtilityWindowActivator?,
 ) {
-    if (isMac()) {
-        DisposableEffect(window) {
-            val listener =
-                object : WindowAdapter() {
-                    override fun windowOpened(e: WindowEvent) {
-                        onActivate(window)
-                    }
+    if (activator == null) {
+        return
+    }
+    DisposableEffect(window, activator) {
+        val listener =
+            object : WindowAdapter() {
+                override fun windowOpened(e: WindowEvent) {
+                    activator.activate(window)
                 }
-            if (window.isShowing) {
-                onActivate(window)
-            } else {
-                window.addWindowListener(listener)
             }
-            onDispose { window.removeWindowListener(listener) }
+        if (window.isShowing) {
+            activator.activate(window)
+        } else {
+            window.addWindowListener(listener)
         }
+        onDispose { window.removeWindowListener(listener) }
     }
 }

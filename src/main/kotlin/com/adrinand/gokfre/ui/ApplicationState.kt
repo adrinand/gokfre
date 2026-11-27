@@ -12,8 +12,10 @@ import com.adrinand.gokfre.core.persistence.repo.SettingsRepository
 import com.adrinand.gokfre.core.screen.ArrangementController
 import com.adrinand.gokfre.core.screen.LinuxRequirement
 import com.adrinand.gokfre.core.screen.LinuxRequirementChecker
+import com.adrinand.gokfre.core.screen.MacUtilityWindowActivator
 import com.adrinand.gokfre.core.screen.createWindowManager
 import com.adrinand.gokfre.core.screen.isLinux
+import com.adrinand.gokfre.core.screen.isMac
 import com.adrinand.gokfre.core.startup.StartupLauncher
 import com.adrinand.gokfre.viewmodel.SettingsViewModel
 import kotlinx.coroutines.CancellationException
@@ -46,6 +48,7 @@ internal data class ApplicationDependencies(
 @Stable
 internal class ApplicationState(
     val settingsViewModel: SettingsViewModel,
+    val utilityWindowActivator: MacUtilityWindowActivator?,
     private val compositionScope: CoroutineScope,
     private val settingsRequestChannel: Channel<Unit>,
     private val shutdownChannel: Channel<Unit>,
@@ -200,9 +203,11 @@ internal fun rememberApplicationState(
     LaunchedEffect(settingsViewModel) {
         onViewModelCreated(settingsViewModel)
     }
+    val utilityWindowActivator = remember { if (isMac()) MacUtilityWindowActivator() else null }
     return remember(settingsViewModel) {
         ApplicationState(
             settingsViewModel = settingsViewModel,
+            utilityWindowActivator = utilityWindowActivator,
             compositionScope = compositionScope,
             settingsRequestChannel = settingsRequestChannel,
             shutdownChannel = shutdownChannel,
