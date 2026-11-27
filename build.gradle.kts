@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.adrinand"
 
-val defaultVersion = "1.0.0"
+val defaultVersion = "1.0.1"
 val appVersion = providers.gradleProperty("version").orElse(defaultVersion).get()
 version = appVersion
 

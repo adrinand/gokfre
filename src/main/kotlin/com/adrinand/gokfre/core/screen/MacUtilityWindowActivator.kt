@@ -26,7 +26,6 @@ private val objcMsgSend: Function? by lazy {
 
 /**
  * Activates Gokfre utility windows on macOS.
- *
  */
 class MacUtilityWindowActivator internal constructor() {
     fun activate(window: Window) {
@@ -136,6 +135,7 @@ private fun pointerField(type: Class<*>): Field? =
         .firstNotNullOfOrNull { runCatching { it.getDeclaredField("ptr") }.getOrNull() }
         ?.apply { isAccessible = true }
 
+@Suppress("FunctionName")
 private interface ObjectiveCRuntime : Library {
     fun objc_getClass(name: String): Pointer?
 
