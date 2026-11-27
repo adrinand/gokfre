@@ -7,17 +7,16 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.adrinand"
 
-val appVersion = providers.gradleProperty("version").orElse("1.0.0").get()
+val defaultVersion = "1.0.0"
+val appVersion = providers.gradleProperty("version").orElse(defaultVersion).get()
 version = appVersion
-// Native packages reject SemVer pre-release labels: RPM forbids '-', and macOS
-// only accepts numeric components. Map X.Y.Z-<label> to each format instead.
-val versionMatch =
-    requireNotNull(Regex("""^(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?$""").matchEntire(appVersion)) {
-        "Version must be X.Y.Z or X.Y.Z-<label>, got '$appVersion'"
-    }
-val baseVersion = versionMatch.groupValues[1]
-val preReleaseLabel = versionMatch.groupValues[2].takeIf { it.isNotBlank() }
-val nativeLinuxVersion = preReleaseLabel?.let { "$baseVersion~$it" } ?: appVersion
+
+// Native packages reject '-'. RCs use '~' for deb/rpm; macOS keeps the
+// numeric base version because Apple does not allow suffixes.
+val rcMatch = Regex("""^(\d+\.\d+\.\d+)-rc(\.\d+)?$""").matchEntire(appVersion)
+val baseVersion = rcMatch?.groupValues?.get(1) ?: appVersion
+val rcSuffix = rcMatch?.groupValues?.get(2).orEmpty()
+val nativeLinuxVersion = if (rcMatch != null) "$baseVersion~rc$rcSuffix" else appVersion
 
 val isLinux = System.getProperty("os.name").lowercase().contains("linux")
 

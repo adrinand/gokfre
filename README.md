@@ -123,19 +123,20 @@ from Actions and select the branch to package. It builds the same artifacts as
 CD and publishes them as a GitHub prerelease. Dispatch it only after CI for the
 branch is green.
 
-- Leave the `version` input empty to auto-increment `X.Y.Z-rc.N` from the
-  version in `build.gradle.kts`.
-- Publishing is gated by the `release-candidate` environment; configure
-  required reviewers under **Settings > Environments**.
-- Prereleases are marked `prerelease` and never become the latest release.
-- The RC tag (`vX.Y.Z-rc.N`) is pushed only after every platform build succeeds.
+The workflow takes no inputs: it reads the version from `build.gradle.kts` and
+appends `-rc` (for example `1.0.0` becomes `v1.0.0-rc`). If you need another
+candidate for the same release, delete the existing `vX.Y.Z-rc` tag or bump the
+version first. Publishing is gated by the `release-candidate` environment;
+configure required reviewers under **Settings > Environments**. Once approved,
+the prerelease is published immediately, marked `prerelease`, and never becomes
+the latest release.
 
 Native packages cannot carry a SemVer suffix as-is, so the CI build maps
-`X.Y.Z-rc.N` to `X.Y.Z~rc.N` for `.deb`/`.rpm` and uses the numeric `X.Y.Z`
-build version for macOS. AppImage and DMG filenames keep the full RC label.
+`X.Y.Z-rc` to `X.Y.Z~rc` for `.deb`/`.rpm` and keeps a numeric `X.Y.Z` version
+for macOS. DMG and AppImage filenames keep the full `-rc` label.
 
 You can build an RC locally by overriding the Gradle version:
 
 ```bash
-./gradlew -Pversion=1.0.0-rc.1 package
+./gradlew -Pversion=1.0.0-rc package
 ```

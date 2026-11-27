@@ -1,22 +1,10 @@
 name: Release Candidate
 
 # Builds installable packages from any branch and publishes them as a
-# GitHub prerelease. Use this to test a packaged build before merging.
+# GitHub prerelease. The version is the committed version plus "-rc".
 # Stable releases stay on CD, which runs only for main.
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: >-
-          Full release candidate version (e.g. 1.0.0-rc.1). Leave empty to
-          auto-increment from the X.Y.Z version in build.gradle.kts.
-        required: false
-        type: string
-      draft:
-        description: Create the GitHub release as a draft.
-        required: false
-        type: boolean
-        default: true
 
 run-name: "Release Candidate: ${{ github.ref_name }} @ ${{ github.sha }}"
 
@@ -48,37 +36,15 @@ jobs:
 
       - name: Resolve release candidate version
         id: resolve
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
-          else
-            BASE=$(./gradlew -q printVersion)
-            if ! [[ "$BASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Project version '$BASE' is not a stable X.Y.Z." >&2
-              echo "Pass an explicit release candidate via the 'version' input." >&2
-              exit 1
-            fi
-            if git rev-parse -q --verify "refs/tags/v${BASE}" >/dev/null; then
-              echo "::warning::Stable tag v${BASE} already exists; this RC will sort below it."
-            fi
-            LATEST=$(git tag -l "v${BASE}-rc.*" | awk -F. '/-rc\./ {print $NF}' | sort -n | tail -1)
-            LATEST=${LATEST:-0}
-            if ! [[ "$LATEST" =~ ^[0-9]+$ ]]; then
-              echo "Unexpected release candidate tag suffix: $LATEST" >&2
-              exit 1
-            fi
-            NEXT=$(( LATEST + 1 ))
-            VERSION="${BASE}-rc.${NEXT}"
-          fi
-
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
-            echo "Invalid release candidate version: $VERSION" >&2
+          BASE=$(./gradlew -q printVersion)
+          if ! [[ "$BASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Project version '$BASE' must be a stable X.Y.Z." >&2
             exit 1
           fi
 
+          VERSION="${BASE}-rc"
           TAG="v${VERSION}"
           if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
             echo "Tag $TAG already exists" >&2
@@ -219,11 +185,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -233,19 +194,13 @@ jobs:
       - name: List artifacts
         run: ls -R artifacts
 
-      - name: Create and push tag
-        env:
-          TAG: ${{ needs.version.outputs.tag }}
-        run: |
-          git tag "$TAG"
-          git push origin "$TAG"
-
       - name: Create GitHub prerelease
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: ${{ needs.version.outputs.tag }}
-          draft: ${{ inputs.draft }}
+          draft: false
           prerelease: true
           make_latest: false
           generate_release_notes: true
