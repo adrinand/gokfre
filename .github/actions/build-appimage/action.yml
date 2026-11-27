@@ -17,9 +17,7 @@ runs:
   steps:
     - name: Create unpackaged app
       shell: bash
-      env:
-        VERSION: ${{ inputs.version }}
-      run: ./gradlew -Pversion="$VERSION" createDistributable
+      run: ./gradlew createDistributable
 
     - name: Build AppImage
       id: build

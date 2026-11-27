@@ -98,8 +98,8 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p build/artifacts
-          cp build/compose/binaries/main/deb/*.deb build/artifacts/
-          cp build/compose/binaries/main/rpm/*.rpm build/artifacts/
+          cp "build/compose/binaries/main/deb/gokfre_${{ needs.version.outputs.version }}_amd64.deb" build/artifacts/
+          cp "build/compose/binaries/main/rpm/gokfre-${{ needs.version.outputs.version }}-1.x86_64.rpm" build/artifacts/
           cp "${{ steps.appimage.outputs.appimage-path }}" build/artifacts/
 
       - name: Upload artifacts
