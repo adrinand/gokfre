@@ -25,7 +25,11 @@ class MacAccessibilityWarningWindowTest {
     @Test
     fun `window shows warning with title and buttons`() {
         composeTestRule.setContent {
-            MacAccessibilityWarningWindow(onDismiss = {}, onOpenSystemSettings = {})
+            MacAccessibilityWarningWindow(
+                utilityWindowActivator = null,
+                onDismiss = {},
+                onOpenSystemSettings = {},
+            )
         }
         composeTestRule.waitForIdle()
 
@@ -40,6 +44,7 @@ class MacAccessibilityWarningWindowTest {
         var opened = false
         composeTestRule.setContent {
             MacAccessibilityWarningWindow(
+                utilityWindowActivator = null,
                 onDismiss = { dismissed = true },
                 onOpenSystemSettings = { opened = true },
             )

@@ -1,6 +1,7 @@
 package com.adrinand.gokfre.ui
 
 import androidx.compose.runtime.Composable
+import com.adrinand.gokfre.core.screen.MacUtilityWindowActivator
 import java.util.logging.Logger
 
 private const val WINDOW_WIDTH_DP = 560
@@ -40,6 +41,7 @@ private val MAC_WARNING_CONTENT =
 
 @Composable
 fun MacAccessibilityWarningWindow(
+    utilityWindowActivator: MacUtilityWindowActivator?,
     onDismiss: () -> Unit,
     onOpenSystemSettings: () -> Unit,
 ) {
@@ -47,6 +49,7 @@ fun MacAccessibilityWarningWindow(
         content = MAC_WARNING_CONTENT,
         onDismiss = onDismiss,
         onAction = onOpenSystemSettings,
+        utilityWindowActivator = utilityWindowActivator,
         widthDp = WINDOW_WIDTH_DP,
         heightDp = WINDOW_HEIGHT_DP,
     )

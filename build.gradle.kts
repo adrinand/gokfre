@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.adrinand"
 
-val defaultVersion = "1.0.0"
+val defaultVersion = "1.0.1"
 val appVersion = providers.gradleProperty("version").orElse(defaultVersion).get()
 version = appVersion
 
@@ -140,6 +140,13 @@ compose.desktop {
                 "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
                 "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
             )
+        if (!isLinux) {
+            jvmArgs +=
+                listOf(
+                    "--add-opens=java.desktop/sun.lwawt=ALL-UNNAMED",
+                    "--add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+                )
+        }
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "gokfre"
@@ -233,6 +240,13 @@ tasks {
         ignoreFailures = false
         dependsOn(copyRustLib)
         systemProperty("jna.library.path", rustLibsDir.get().asFile.absolutePath)
+        if (!isLinux) {
+            jvmArgs(
+                "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
+                "--add-opens=java.desktop/sun.lwawt=ALL-UNNAMED",
+                "--add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+            )
+        }
     }
 
     named("check") {

@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.window.ApplicationScope
 import com.adrinand.gokfre.core.hotkey.GlobalHotkeyProvider
+import com.adrinand.gokfre.core.screen.MacUtilityWindowActivator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -53,21 +54,30 @@ internal fun ApplicationScope.GokfreApplicationContent(
             isVisible = state.isSettingsVisible,
             onClose = state::dismissSettings,
             viewModel = state.settingsViewModel,
+            utilityWindowActivator = state.utilityWindowActivator,
         )
     }
 
-    WarningWindows(state)
+    WarningWindows(
+        state = state,
+        utilityWindowActivator = state.utilityWindowActivator,
+    )
 }
 
 @Composable
-private fun WarningWindows(state: ApplicationState) {
+private fun WarningWindows(
+    state: ApplicationState,
+    utilityWindowActivator: MacUtilityWindowActivator?,
+) {
     if (state.linuxMissingRequirements.isNotEmpty()) {
         LinuxWarningWindow(
             requirements = state.linuxMissingRequirements,
             onDismiss = state::dismissLinuxWarning,
+            utilityWindowActivator = utilityWindowActivator,
         )
     } else if (state.isMacAccessibilityWarningVisible) {
         MacAccessibilityWarningWindow(
+            utilityWindowActivator = utilityWindowActivator,
             onDismiss = state::dismissMacWarning,
             onOpenSystemSettings = ::openAccessibilitySettings,
         )

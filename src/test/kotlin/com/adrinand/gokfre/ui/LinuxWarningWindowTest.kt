@@ -27,6 +27,7 @@ class LinuxWarningWindowTest {
             LinuxWarningWindow(
                 requirements = listOf(LinuxRequirement.UNSUPPORTED_WAYLAND_COMPOSITOR),
                 onDismiss = {},
+                utilityWindowActivator = null,
             )
         }
         composeTestRule.waitForIdle()
@@ -38,7 +39,11 @@ class LinuxWarningWindowTest {
     @Test
     fun `nothing is rendered without requirements`() {
         composeTestRule.setContent {
-            LinuxWarningWindow(requirements = emptyList(), onDismiss = {})
+            LinuxWarningWindow(
+                requirements = emptyList(),
+                onDismiss = {},
+                utilityWindowActivator = null,
+            )
         }
         composeTestRule.waitForIdle()
 

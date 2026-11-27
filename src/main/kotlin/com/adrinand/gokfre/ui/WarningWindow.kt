@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
+import com.adrinand.gokfre.core.screen.MacUtilityWindowActivator
+import com.adrinand.gokfre.core.screen.isMac
 
 private const val DEFAULT_WINDOW_WIDTH_DP = 600
 private const val DEFAULT_WINDOW_HEIGHT_DP = 320
@@ -32,6 +34,7 @@ fun WarningWindow(
     content: WarningContent,
     onDismiss: () -> Unit,
     onAction: (() -> Unit)? = null,
+    utilityWindowActivator: MacUtilityWindowActivator?,
     widthDp: Int = DEFAULT_WINDOW_WIDTH_DP,
     heightDp: Int = DEFAULT_WINDOW_HEIGHT_DP,
 ) {
@@ -39,7 +42,9 @@ fun WarningWindow(
         onCloseRequest = onDismiss,
         title = content.windowTitle,
         state = rememberWindowState(width = widthDp.dp, height = heightDp.dp),
+        alwaysOnTop = isMac(),
     ) {
+        MacUtilityWindowActivation(window, activator = utilityWindowActivator)
         WarningDialog(content = content, onDismiss = onDismiss, onAction = onAction)
     }
 }
