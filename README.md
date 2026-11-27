@@ -103,7 +103,7 @@ Local builds produce packages for the host OS:
 ./gradlew package      # .deb / .rpm on Linux, .dmg on macOS
 ```
 
-The AppImage is built by the CD workflow because it requires `appimagetool`, which the workflow downloads automatically.
+The AppImage is built by the release workflows because it requires `appimagetool`, which the workflows download automatically.
 
 The release CD workflow (`.github/workflows/cd.yml`) builds and publishes:
 
@@ -115,3 +115,27 @@ The release CD workflow (`.github/workflows/cd.yml`) builds and publishes:
 - `Gokfre-<version>-aarch64.AppImage`
 
 on every push to `main` for which the version in `build.gradle.kts` has changed.
+
+### Release candidates
+
+To test a packaged build before merging, run the **Release Candidate** workflow
+from Actions and select the branch to package. It builds the same artifacts as
+CD and publishes them as a GitHub prerelease. Dispatch it only after CI for the
+branch is green.
+
+- Leave the `version` input empty to auto-increment `X.Y.Z-rc.N` from the
+  version in `build.gradle.kts`.
+- Publishing is gated by the `release-candidate` environment; configure
+  required reviewers under **Settings > Environments**.
+- Prereleases are marked `prerelease` and never become the latest release.
+- The RC tag (`vX.Y.Z-rc.N`) is pushed only after every platform build succeeds.
+
+Native packages cannot carry a SemVer suffix as-is, so the CI build maps
+`X.Y.Z-rc.N` to `X.Y.Z~rc.N` for `.deb`/`.rpm` and uses the numeric `X.Y.Z`
+build version for macOS. AppImage and DMG filenames keep the full RC label.
+
+You can build an RC locally by overriding the Gradle version:
+
+```bash
+./gradlew -Pversion=1.0.0-rc.1 package
+```

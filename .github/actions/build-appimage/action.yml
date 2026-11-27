@@ -17,14 +17,17 @@ runs:
   steps:
     - name: Create unpackaged app
       shell: bash
-      run: ./gradlew createDistributable
+      env:
+        VERSION: ${{ inputs.version }}
+      run: ./gradlew -Pversion="$VERSION" createDistributable
 
     - name: Build AppImage
       id: build
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
-        VERSION="${{ inputs.version }}"
         APP_NAME="gokfre"
         PACKAGE_NAME="Gokfre"
         APP_DIR="$PWD/build/AppDir"

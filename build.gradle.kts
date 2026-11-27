@@ -6,7 +6,18 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.adrinand"
-version = "1.0.0"
+
+val appVersion = providers.gradleProperty("version").orElse("1.0.0").get()
+version = appVersion
+// Native packages reject SemVer pre-release labels: RPM forbids '-', and macOS
+// only accepts numeric components. Map X.Y.Z-<label> to each format instead.
+val versionMatch =
+    requireNotNull(Regex("""^(\d+\.\d+\.\d+)(?:-([0-9A-Za-z.-]+))?$""").matchEntire(appVersion)) {
+        "Version must be X.Y.Z or X.Y.Z-<label>, got '$appVersion'"
+    }
+val baseVersion = versionMatch.groupValues[1]
+val preReleaseLabel = versionMatch.groupValues[2].takeIf { it.isNotBlank() }
+val nativeLinuxVersion = preReleaseLabel?.let { "$baseVersion~$it" } ?: appVersion
 
 val isLinux = System.getProperty("os.name").lowercase().contains("linux")
 
@@ -136,7 +147,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "gokfre"
-            packageVersion = version.toString()
+            packageVersion = baseVersion
             description = "A keyboard-driven tiling window manager"
             copyright = "© 2026 adrinand"
             vendor = "adrinand"
@@ -144,6 +155,7 @@ compose.desktop {
             macOS {
                 bundleID = "com.adrinand.gokfre"
                 iconFile.set(project.file("src/main/resources/gokfre.icns"))
+                dmgPackageVersion = baseVersion
                 infoPlist {
                     extraKeysRawXml =
                         """
@@ -155,6 +167,8 @@ compose.desktop {
 
             linux {
                 iconFile.set(project.file("src/main/resources/gokfre.png"))
+                debPackageVersion = nativeLinuxVersion
+                rpmPackageVersion = nativeLinuxVersion
             }
         }
     }
